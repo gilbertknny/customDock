@@ -44,9 +44,10 @@ A MacBook-style notch that hangs from the top edge of the screen: square top, ro
 > Notifications are read from Windows' own notification database (read-only), so you get every app's notifications, including chat avatars. *Dismiss* hides them in FrostShell only. To avoid seeing each one twice, turn off **Show notification banners** for chatty apps in *Settings → System → Notifications*; they still reach Notification Center and FrostShell.
 
 ### 🚀 Dock
+- **Start button** first in the dock, using your system's own Windows logo; click to open Start
 - **Settings window** (tray → *Settings…*, or right-click the dock): search every installed app (Start menu, Store and desktop apps) and click **Add**, drag to reorder, remove, add separators, or **Browse…** for any `.exe`. Icon size, magnification, auto-hide and taskbar hiding live there too, all applied instantly
 - **macOS-style magnification** with smooth cosine falloff
-- **Native Windows icons** for everything (Win32 `.exe`/`.lnk`, Microsoft Store apps, Settings, Recycle Bin…), extracted at up to 256 px so they stay sharp when magnified
+- **Native Windows icons** for everything, taken the same way Explorer and the taskbar get them (shortcut overrides, Store apps, Settings, Recycle Bin…), at up to 256 px so they stay sharp when magnified
 - **Uniform square plates**: every icon sits on the same rounded-square glass tile, so mixed icon shapes line up neatly (`"iconStyle": "plain"` turns it off)
 - **Open apps appear automatically**: anything you open that isn't pinned pops into the dock (after a subtle divider) while it runs and disappears when you close it, just like macOS. Right-click → **Keep in dock** to pin it
 - **Click to focus, not relaunch**: clicking a running app brings its window forward; click again to minimize; several windows cycle. **Shift-click** or **middle-click** opens a new window
@@ -138,6 +139,7 @@ Most dock options are in the **Settings** window. Everything else lives in `%APP
     "showRunning": true,           // open-but-unpinned apps appear in the dock
     "iconStyle": "square",         // square (uniform plate) | plain
     "items": [
+      { "name": "Start", "path": "frost:start", "icon": "%WINDIR%\\System32\\winver.exe", "process": false },
       { "name": "Edge", "path": "%ProgramFiles(x86)%\\Microsoft\\Edge\\Application\\msedge.exe" },
       { "name": "Terminal", "path": "shell:AppsFolder\\Microsoft.WindowsTerminal_8wekyb3d8bbwe!App", "process": "WindowsTerminal.exe" },
       { "name": "Settings", "path": "ms-settings:", "process": "SystemSettings.exe" },
@@ -175,7 +177,7 @@ Most dock options are in the **Settings** window. Everything else lives in `%APP
 | Field | Description |
 |---|---|
 | `name` | Tooltip label |
-| `path` | `.exe`, `.lnk`, folder, URI (`ms-settings:`, `steam://…`), `shell:RecycleBinFolder`, or a Store app as `shell:AppsFolder\\<AUMID>`. `%ENV%` vars are expanded |
+| `path` | `frost:start` (Start button), `.exe`, `.lnk`, folder, URI (`ms-settings:`, `steam://…`), `shell:RecycleBinFolder`, or a Store app as `shell:AppsFolder\\<AUMID>`. `%ENV%` vars are expanded |
 | `args` | Optional argument array |
 | `icon` | Optional override. By default the app's own Windows icon is used. Accepts `.png/.ico/.jpg`, or a resource like `%WINDIR%\\System32\\imageres.dll,-55` |
 | `process` | Process name for the running dot. Defaults to the exe name; `false` disables it |

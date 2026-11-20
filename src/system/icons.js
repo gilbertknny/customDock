@@ -86,6 +86,8 @@ function candidates(item) {
   }
 
   if (path.isAbsolute(target)) {
+    // the exact icon Explorer/taskbar show (handles .lnk overrides, Squirrel apps, etc.)
+    list.push({ kind: 'shell', path: target });
     if (/\.lnk$/i.test(target)) {
       try {
         const link = shell.readShortcutLink(target);
@@ -96,7 +98,6 @@ function candidates(item) {
     const fam = aliasFamily(target);
     if (fam) list.push({ kind: 'appx', family: fam });
     list.push({ kind: 'file', file: target, index: 0 });
-    list.push({ kind: 'shell', path: target }); // folders, documents, anything else
   }
   return list;
 }

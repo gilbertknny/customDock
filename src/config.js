@@ -34,7 +34,25 @@ function load() {
     }
   }
   current = merge(defaults, user);
+  if (migrate(current)) save(current);
   return current;
+}
+
+// One-time upgrades for configs created by older versions. Each runs once,
+// so removing e.g. the Start button later sticks.
+function migrate(cfg) {
+  cfg.migrations = cfg.migrations || {};
+  let changed = false;
+  if (!cfg.migrations.startButton) {
+    cfg.migrations.startButton = true;
+    const items = cfg.dock.items || [];
+    if (!items.some((i) => i && i.path === 'frost:start')) {
+      const start = defaults.dock.items.find((i) => i.path === 'frost:start');
+      if (start) items.unshift({ ...start });
+    }
+    changed = true;
+  }
+  return changed;
 }
 
 function get() {

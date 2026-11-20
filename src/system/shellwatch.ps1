@@ -3,7 +3,7 @@
 #   * reports volume / mute / brightness changes (hardware keys)     {"t":"volume","v":0.42,"m":false} / {"t":"brightness","v":70}
 #   * optionally keeps the Windows taskbar hidden (-HideTaskbar 1)   {"t":"taskbar","autohide":false}
 #   * lists open app windows (like the taskbar does)                 {"t":"windows","list":[...]}
-# stdin commands (one JSON per line): {"cmd":"activate","hwnds":[..]} | {"cmd":"close","hwnds":[..]}
+# stdin commands (one JSON per line): {"cmd":"activate","hwnds":[..]} | {"cmd":"close","hwnds":[..]} | {"cmd":"start"}
 # The taskbar is ALWAYS restored when this script ends normally (FrostShell quits, crashes,
 # or the option is switched off). -Restore runs only the restore step.
 param(
@@ -135,6 +135,13 @@ public static class FrostWindows {
     else ShowWindow(new IntPtr(fg), 6 /*SW_MINIMIZE*/);
   }
 
+  [DllImport("user32.dll")] static extern void keybd_event(byte vk, byte scan, uint flags, UIntPtr extra);
+  // same as pressing the Windows key: opens/closes Start
+  public static void OpenStart() {
+    keybd_event(0x5B /*VK_LWIN*/, 0, 0, UIntPtr.Zero);
+    keybd_event(0x5B, 0, 2 /*KEYUP*/, UIntPtr.Zero);
+  }
+
   public static void Close(long[] hwnds) {
     foreach (var h in hwnds) PostMessage(new IntPtr(h), 0x0010 /*WM_CLOSE*/, IntPtr.Zero, IntPtr.Zero);
   }
@@ -244,6 +251,7 @@ function Invoke-WatchCmd($line) {
   switch ($c.cmd) {
     'activate' { [FrostWindows]::ActivateGroup($h) }
     'close' { [FrostWindows]::Close($h) }
+    'start' { [FrostWindows]::OpenStart() }
   }
   $script:lastWin = '' # re-emit soon so the dock reflects it
 }

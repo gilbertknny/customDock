@@ -89,6 +89,7 @@ function runDetached(file, args = [], cwd) {
 function launch(item) {
   if (!item || !item.path) return;
   const target = expandPath(item.path);
+  if (target === 'frost:start') return shellwatch.send({ cmd: 'start' }); // the Start button
   // shell:RecycleBinFolder, shell:AppsFolder\<AUMID> (Store apps), …
   if (/^shell:/i.test(target)) return runDetached('explorer.exe', [target]);
   if (isUri(target)) return shell.openExternal(target);

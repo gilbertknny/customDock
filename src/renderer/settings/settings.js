@@ -42,6 +42,7 @@
 
   function describe(item) {
     const p = item.path || '';
+    if (p === 'frost:start') return 'Opens the Start menu';
     if (/^shell:AppsFolder\\/i.test(p)) return item.process ? 'Desktop app' : 'App';
     if (/^shell:/i.test(p)) return 'Windows folder';
     if (/^[a-z][a-z0-9+.-]+:/i.test(p) && !/^[a-z]:\\/i.test(p)) return p;

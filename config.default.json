@@ -19,6 +19,7 @@
     "hideTaskbar": false,
     "showRunning": true,
     "items": [
+      { "name": "Start", "path": "frost:start", "icon": "%WINDIR%\\System32\\winver.exe", "process": false },
       { "name": "File Explorer", "path": "%WINDIR%\\explorer.exe", "process": false },
       { "name": "Microsoft Edge", "path": "%ProgramFiles(x86)%\\Microsoft\\Edge\\Application\\msedge.exe" },
       { "name": "Terminal", "path": "shell:AppsFolder\\Microsoft.WindowsTerminal_8wekyb3d8bbwe!App", "process": "WindowsTerminal.exe" },

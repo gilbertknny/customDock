@@ -48,7 +48,9 @@ A MacBook-style notch that hangs from the top edge of the screen: square top, ro
 - **macOS-style magnification** with smooth cosine falloff
 - **Native Windows icons** for everything (Win32 `.exe`/`.lnk`, Microsoft Store apps, Settings, Recycle Bin…), extracted at up to 256 px so they stay sharp when magnified
 - **Uniform square plates**: every icon sits on the same rounded-square glass tile, so mixed icon shapes line up neatly (`"iconStyle": "plain"` turns it off)
-- **Running indicators** (dot under apps that are open)
+- **Open apps appear automatically**: anything you open that isn't pinned pops into the dock (after a subtle divider) while it runs and disappears when you close it, just like macOS. Right-click → **Keep in dock** to pin it
+- **Click to focus, not relaunch**: clicking a running app brings its window forward; click again to minimize; several windows cycle. **Shift-click** or **middle-click** opens a new window
+- **Running indicators** (dot under apps that are open), plus **Close window** in the right-click menu
 - **Launch bounce** animation
 - **Drag to reorder** on the dock itself, right-click → *Add apps…*, *Remove*, *Show file location*, *Add separator*
 - **Auto-hide** with a bottom hot-edge
@@ -133,6 +135,7 @@ Most dock options are in the **Settings** window. Everything else lives in `%APP
     "aboveTaskbar": true,
     "margin": 10,
     "hideTaskbar": false,          // hide the Windows taskbar while FrostShell runs
+    "showRunning": true,           // open-but-unpinned apps appear in the dock
     "iconStyle": "square",         // square (uniform plate) | plain
     "items": [
       { "name": "Edge", "path": "%ProgramFiles(x86)%\\Microsoft\\Edge\\Application\\msedge.exe" },
@@ -223,7 +226,7 @@ src/
 │   ├── icons.ps1/.js    # native Windows icon extraction (exe/dll + Store apps)
 │   ├── controls.ps1/.js # volume, brightness, radios, power mode, focus
 │   ├── notifications.js # mirrors Windows Notification Center (read-only)
-│   ├── shellwatch.ps1/.js # fullscreen detection, volume/brightness keys, taskbar hiding
+│   ├── shellwatch.ps1/.js # open windows, focus/close, fullscreen detection, volume/brightness keys, taskbar hiding
 │   ├── wallpaper.js     # finds & watches the current wallpaper
 │   ├── processes.js     # running-app detection (tasklist)
 │   └── stats.js         # CPU / RAM
@@ -245,7 +248,7 @@ src/
 - [ ] Inline reply / toast action buttons
 - [ ] Native acrylic/mica mode (blur real windows, not only the wallpaper)
 - [ ] Settings pages for the notch & notifications
-- [ ] Window previews on dock hover
+- [ ] Window thumbnails on dock hover
 
 PRs are very welcome!
 
@@ -257,7 +260,7 @@ PRs are very welcome!
 
 - **Notch**: nempel di tepi atas layar, mengecil pas diam dan membesar saat kursor mendekat. Hover buat buka panel dengan 3 tab: **Home** (jam, musik, CPU/RAM/baterai), **Controls** (kecerahan, volume, mute, WiFi dengan daftar jaringan dan connect pakai password, Bluetooth, mode Normal / Airplane / Low power / Focus), dan **Notifications** (semua notifikasi Windows).
 - **Notifikasi baru** turun dari notch sebagai toast selama 6 detik. Hover buat nahan dan muncul tombol Open/Dismiss. Kalau kelewat, ada badge merah di notch, dan pas di-hover langsung kebuka di tab Notifications. Kalau mode Focus nyala, cuma badge aja tanpa pop-up.
-- **Dock**: bisa nyembunyiin taskbar Windows (tray → *Hide Windows taskbar*), otomatis sembunyi pas ada app fullscreen, efek magnify, ikon asli bawaan Windows (diseragamkan di atas alas kotak), indikator app yang lagi jalan, drag buat ngatur urutan, auto-hide.
+- **Dock**: app yang lagi kebuka otomatis muncul di dock (klik buat nampilin window-nya, klik kanan → *Keep in dock* buat pin), bisa nyembunyiin taskbar Windows (tray → *Hide Windows taskbar*), otomatis sembunyi pas ada app fullscreen, efek magnify, ikon asli bawaan Windows (diseragamkan di atas alas kotak), indikator app yang lagi jalan, drag buat ngatur urutan, auto-hide.
 - **Glass beneran**: wallpaper kamu di-blur di belakang tiap panel, jadi efek kacanya kelihatan nyata, bukan cuma kotak transparan.
 
 Tambah app ke dock: klik kanan ikon tray → *Settings…*, cari app-nya, klik **Add**.

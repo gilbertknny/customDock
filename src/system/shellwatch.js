@@ -16,6 +16,7 @@ class ShellWatch extends EventEmitter {
     this.origAutoHide = null; // taskbar state before we touched it
     this.fullscreen = false;
     this.seen = {}; // first reading of volume/brightness is a baseline, not a change
+    this.windows = [];
   }
 
   start({ hideTaskbar = false } = {}) {
@@ -57,6 +58,10 @@ class ShellWatch extends EventEmitter {
       return;
     }
     if (m.t === 'taskbar') this.origAutoHide = !!m.autohide;
+    if (m.t === 'windows') {
+      this.windows = Array.isArray(m.list) ? m.list : m.list ? [m.list] : [];
+      this.emit('windows', this.windows);
+    }
     if (m.t === 'fullscreen') {
       this.fullscreen = !!m.v;
       this.emit('fullscreen', this.fullscreen);
@@ -67,6 +72,11 @@ class ShellWatch extends EventEmitter {
       const payload = m.t === 'volume' ? { kind: 'volume', value: m.v, muted: !!m.m } : { kind: 'brightness', value: m.v / 100 };
       this.emit('level', payload, first);
     }
+  }
+
+  // {cmd:'activate'|'close', hwnds:[...]}
+  send(cmd) {
+    if (this.child && this.child.stdin.writable) this.child.stdin.write(JSON.stringify(cmd) + '\n');
   }
 
   // switching taskbar hiding on/off restarts the loop

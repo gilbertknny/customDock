@@ -1,13 +1,17 @@
 // Minimal, explicit bridge between renderers and the main process.
 const { contextBridge, ipcRenderer, webUtils } = require('electron');
 
-const CHANNELS = ['config', 'media', 'stats', 'running', 'wallpaper', 'geometry', 'notifications', 'osd'];
+const CHANNELS = ['config', 'media', 'stats', 'running', 'wallpaper', 'geometry', 'notifications', 'osd', 'windows'];
 
 contextBridge.exposeInMainWorld('frost', {
   init: () => ipcRenderer.invoke('init'),
   setIgnore: (ignore) => ipcRenderer.send('ignore', ignore),
   launch: (index) => ipcRenderer.send('launch', index),
-  dockMenu: (index) => ipcRenderer.send('dock-menu', index),
+  dockMenu: (index, groupKey) => ipcRenderer.send('dock-menu', index, groupKey),
+  runningMenu: (key) => ipcRenderer.send('running-menu', key),
+  winActivate: (hwnds) => ipcRenderer.send('win-activate', hwnds),
+  winClose: (hwnds) => ipcRenderer.send('win-close', hwnds),
+  pin: (key) => ipcRenderer.send('dock-pin', key),
   addPaths: (paths) => ipcRenderer.send('dock-add', paths),
   pathForFile: (file) => webUtils.getPathForFile(file),
   reorder: (from, to) => ipcRenderer.send('dock-reorder', from, to),

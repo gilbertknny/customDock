@@ -266,6 +266,7 @@ const DOCK_OPTIONS = {
   aboveTaskbar: (v) => typeof v === 'boolean',
   hideTaskbar: (v) => typeof v === 'boolean',
   iconStyle: (v) => v === 'square' || v === 'plain',
+  showRunning: (v) => typeof v === 'boolean',
 };
 
 // ---------- dock editing ----------
@@ -302,6 +303,50 @@ async function addAppDialog() {
   if (!res.canceled) addPaths(res.filePaths);
 }
 
+// ---------- running apps (open windows -> dock) ----------
+let appNames = {}; // AUMID (lowercase) -> Start-menu name
+let runningGroups = [];
+
+function groupWindows(list) {
+  const groups = new Map();
+  for (const w of list || []) {
+    if (!w || !w.hwnd) continue;
+    const aumid = w.aumid || null;
+    const key = aumid ? `a:${aumid.toLowerCase()}` : w.path ? `p:${w.path.toLowerCase()}` : `h:${w.hwnd}`;
+    let g = groups.get(key);
+    if (!g) {
+      const exe = w.path ? path.win32.basename(w.path) : null; // Windows paths, even when run elsewhere
+      const name = (aumid && appNames[aumid.toLowerCase()]) || w.desc || (exe ? exe.replace(/\.exe$/i, '') : w.title);
+      g = { key, aumid, path: w.path || null, exe, name, hwnds: [] };
+      groups.set(key, g);
+    }
+    g.hwnds.push(w.hwnd);
+  }
+  return [...groups.values()];
+}
+
+function publishWindows() {
+  runningGroups = groupWindows(shellwatch.windows);
+  if (windows.dock && !windows.dock.isDestroyed()) windows.dock.webContents.send('windows', runningGroups);
+}
+
+const knownHwnds = (hwnds) => {
+  const all = new Set(runningGroups.flatMap((g) => g.hwnds));
+  return (Array.isArray(hwnds) ? hwnds : []).filter((h) => all.has(h));
+};
+
+function pinGroup(key) {
+  const g = runningGroups.find((x) => x.key === key);
+  if (!g) return;
+  const item = { name: g.name || g.exe || 'App', path: g.aumid ? `shell:AppsFolder\\${g.aumid}` : g.path };
+  if (g.exe && !/^applicationframehost\.exe$/i.test(g.exe)) item.process = g.exe;
+  if (!item.path) return;
+  updateItems((list) => {
+    const sep = list.findIndex((i) => i.type === 'separator');
+    list.splice(sep >= 0 ? sep : list.length, 0, item);
+  });
+}
+
 // ---------- IPC ----------
 // Only our own bundled pages may talk to the main process. If anything else ever got
 // loaded into a window (e.g. a dropped .html file), its IPC calls are ignored.
@@ -331,6 +376,7 @@ handle('init', (e) => {
     stats: stats.last || { cpu: 0, mem: 0 },
     running: processes.list(),
     notifications: notifications.visible(),
+    windows: runningGroups,
   };
 });
 
@@ -353,6 +399,28 @@ on('open-settings', (_e, uri) => {
 });
 on('notif-dismiss', (_e, ids) => notifications.dismiss(ids || []));
 on('dock-add', (_e, paths) => addPaths(Array.isArray(paths) ? paths : []));
+// only windows that are really open right now can be activated/closed
+on('win-activate', (_e, hwnds) => {
+  const h = knownHwnds(hwnds);
+  if (h.length) shellwatch.send({ cmd: 'activate', hwnds: h });
+});
+on('win-close', (_e, hwnds) => {
+  const h = knownHwnds(hwnds);
+  if (h.length) shellwatch.send({ cmd: 'close', hwnds: h });
+});
+on('dock-pin', (_e, key) => pinGroup(String(key)));
+on('running-menu', (e, key) => {
+  const g = runningGroups.find((x) => x.key === key);
+  if (!g) return;
+  Menu.buildFromTemplate([
+    { label: g.name || g.exe || 'App', enabled: false },
+    { type: 'separator' },
+    { label: 'Keep in dock', click: () => pinGroup(g.key) },
+    { label: 'New window', enabled: !!(g.aumid || g.path), click: () => (g.aumid ? runDetached('explorer.exe', [`shell:AppsFolder\\${g.aumid}`]) : runDetached(g.path)) },
+    { type: 'separator' },
+    { label: g.hwnds.length > 1 ? `Close ${g.hwnds.length} windows` : 'Close window', click: () => shellwatch.send({ cmd: 'close', hwnds: g.hwnds }) },
+  ]).popup({ window: BrowserWindow.fromWebContents(e.sender) });
+});
 handle('apps-list', (_e, refresh) => apps.list({ demo: DEMO, refresh: !!refresh }));
 handle('dock-set-items', (_e, items) => {
   const clean = sanitizeItems(items);
@@ -406,8 +474,9 @@ on('action', (_e, index) => {
   else if (a.path) runDetached(expandPath(a.path), (a.args || []).map(expandPath));
 });
 
-on('dock-menu', (e, index) => {
+on('dock-menu', (e, index, groupKey) => {
   const win = BrowserWindow.fromWebContents(e.sender);
+  const running = groupKey ? runningGroups.find((x) => x.key === groupKey) : null;
   const cfg = config.get();
   const item = index >= 0 ? cfg.dock.items[index] : null;
   const tpl = [];
@@ -422,6 +491,15 @@ on('dock-menu', (e, index) => {
         enabled: !isUri(target) && path.isAbsolute(target),
         click: () => shell.showItemInFolder(target),
       },
+      ...(running
+        ? [
+            { type: 'separator' },
+            {
+              label: running.hwnds.length > 1 ? `Close ${running.hwnds.length} windows` : 'Close window',
+              click: () => shellwatch.send({ cmd: 'close', hwnds: running.hwnds }),
+            },
+          ]
+        : []),
       { type: 'separator' },
       { label: 'Remove from dock', click: () => updateItems((l) => l.splice(index, 1)) }
     );
@@ -542,6 +620,11 @@ app.whenReady().then(() => {
   notifications.on('update', (p) => broadcast('notifications', p));
   shellwatch.on('fullscreen', (fs) => setFullscreenHidden(config.get().hideOnFullscreen !== false && fs));
   shellwatch.on('level', (p, first) => !first && broadcast('osd', p)); // hardware keys -> notch OSD
+  shellwatch.on('windows', publishWindows);
+  apps.list({ demo: DEMO }).then((list) => {
+    appNames = Object.fromEntries((list || []).map((a) => [String(a.id).toLowerCase(), a.name]));
+    publishWindows();
+  });
   processes.on('update', (list) => broadcast('running', list));
   stats.on('update', (s) => broadcast('stats', s));
   wallpaper.on('update', (url) => broadcast('wallpaper', url));

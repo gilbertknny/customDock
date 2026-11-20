@@ -233,7 +233,7 @@
       sendOptions({ [id]: Number(el.value) });
     });
   }
-  for (const id of ['autoHide', 'hideTaskbar', 'aboveTaskbar']) {
+  for (const id of ['autoHide', 'hideTaskbar', 'aboveTaskbar', 'showRunning']) {
     $(`#${id}`).addEventListener('change', (e) => frost.setDockOptions({ [id]: e.target.checked }));
   }
   $('#iconStyle').addEventListener('change', (e) => frost.setDockOptions({ iconStyle: e.target.checked ? 'square' : 'plain' }));
@@ -246,6 +246,7 @@
     $('#magnification-v').textContent = fmt.magnification(d.magnification);
     $('#iconStyle').checked = d.iconStyle !== 'plain';
     $('#autoHide').checked = !!d.autoHide;
+    $('#showRunning').checked = d.showRunning !== false;
     $('#hideTaskbar').checked = !!d.hideTaskbar;
     $('#aboveTaskbar').checked = d.aboveTaskbar !== false;
     $('#row-above').classList.toggle('disabled', !!d.hideTaskbar || !!d.autoHide);

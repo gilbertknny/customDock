@@ -9,8 +9,11 @@
   const init = await frost.init();
   let cfg = init.config;
   let running = new Set((init.running || []).map((n) => n.toLowerCase()));
+  let groups = init.windows || []; // open app windows, grouped per app (from main)
+  let extrasSig = '';
   let itemEls = [];
   let hideTimer = null;
+  let prevExtras = new Set(groups.map((g) => g.key));
   let dragFrom = -1;
 
   ui.glassify($('#dock-bg'));
@@ -30,6 +33,26 @@
 
   // Always the real Windows icon (resolved by the main process); the square plate
   // behind it is what makes every icon look uniform.
+  const lc = (v) => String(v || '').toLowerCase();
+  const exeOf = (p) => ((p || '').match(/([^\\/]+\.exe)$/i) || [])[1];
+
+  // which open-window group belongs to a pinned dock item?
+  function groupFor(item) {
+    if (!item || item.type === 'separator') return null;
+    const aumid = ((item.path || '').match(/^shell:AppsFolder\\(.+)$/i) || [])[1];
+    const exes = [typeof item.process === 'string' ? item.process : null, exeOf(item.path)].filter(Boolean).map(lc);
+    return (
+      groups.find((g) => (aumid && lc(g.aumid) === lc(aumid)) || (g.exe && exes.includes(lc(g.exe)))) || null
+    );
+  }
+
+  // running apps that aren't pinned: shown before the first separator, like macOS
+  function extraGroups() {
+    if (cfg.dock.showRunning === false) return [];
+    const taken = new Set(cfg.dock.items.map(groupFor).filter(Boolean).map((g) => g.key));
+    return groups.filter((g) => !taken.has(g.key));
+  }
+
   async function setIcon(tile, item) {
     let url = null;
     try {
@@ -56,7 +79,33 @@
 
     itemsEl.replaceChildren();
     itemEls = [];
+    const extras = extraGroups();
+    extrasSig = extras.map((g) => g.key).join('|');
+    const firstSep = d.items.findIndex((i) => i.type === 'separator');
+    const addExtras = () => {
+      if (extras.length && itemsEl.querySelector('.item')) {
+        const div = document.createElement('div');
+        div.className = 'sep auto'; // pinned | open-but-not-pinned
+        itemsEl.append(div);
+      }
+      for (const g of extras) {
+        const el = document.createElement('div');
+        el.className = 'item running extra' + (prevExtras.has(g.key) ? '' : ' appear');
+        el.dataset.extra = g.key;
+        const tile = document.createElement('div');
+        tile.className = 'tile loading';
+        tile.innerHTML = Icons.placeholder;
+        el.append(tile);
+        setIcon(tile, { path: g.aumid ? `shell:AppsFolder\\${g.aumid}` : g.path });
+        el._item = { name: g.name || g.exe || 'App' };
+        el._group = g;
+        itemsEl.append(el);
+        itemEls.push(el);
+      }
+      prevExtras = new Set(extras.map((g) => g.key));
+    };
     d.items.forEach((item, i) => {
+      if (i === firstSep) addExtras();
       if (item.type === 'separator') {
         const sep = document.createElement('div');
         sep.className = 'sep';
@@ -77,14 +126,18 @@
       itemsEl.append(el);
       itemEls.push(el);
     });
+    if (firstSep < 0) addExtras();
     updateRunning();
     requestAnimationFrame(ui.syncGlass);
   }
 
   function updateRunning() {
     for (const el of itemEls) {
+      if (el._group) continue; // extras are running by definition
       const p = procName(el._item);
-      el.classList.toggle('running', !!p && running.has(p));
+      const g = groupFor(el._item);
+      el._running = g;
+      el.classList.toggle('running', !!g || (!!p && running.has(p)));
     }
   }
 
@@ -144,7 +197,9 @@
   itemsEl.addEventListener('click', (e) => {
     const el = e.target.closest('.item');
     if (!el) return;
+    if (el._group) return frost.winActivate(el._group.hwnds);
     const idx = Number(el.dataset.index);
+    if (el._running && !e.shiftKey) return frost.winActivate(el._running.hwnds); // bring it forward
     if (!el.classList.contains('running')) {
       el.classList.remove('bounce');
       void el.offsetWidth;
@@ -154,11 +209,20 @@
     frost.launch(idx);
   });
 
+  itemsEl.addEventListener('auxclick', (e) => {
+    if (e.button !== 1) return;
+    const el = e.target.closest('.item');
+    if (el && !el._group) frost.launch(Number(el.dataset.index)); // middle-click: new window
+  });
+
   wrap.addEventListener('contextmenu', (e) => {
     e.preventDefault();
-    const el = e.target.closest('[data-index]');
     tip.classList.remove('show');
-    frost.dockMenu(el ? Number(el.dataset.index) : -1);
+    const extra = e.target.closest('[data-extra]');
+    if (extra) return frost.runningMenu(extra.dataset.extra);
+    const el = e.target.closest('[data-index]');
+    const item = el && el.classList.contains('item') ? itemEls.find((x) => x === el) : null;
+    frost.dockMenu(el ? Number(el.dataset.index) : -1, item && item._running ? item._running.key : undefined);
   });
 
   // ----- drag to reorder / drop files to pin -----
@@ -201,6 +265,17 @@
       if (to !== dragFrom) frost.reorder(dragFrom, to);
     }
     dragFrom = -1;
+  });
+
+  frost.on('windows', (list) => {
+    groups = Array.isArray(list) ? list : [];
+    const sig = extraGroups().map((g) => g.key).join('|');
+    if (sig !== extrasSig) render(); // apps opened/closed -> dock grows/shrinks
+    else {
+      // same apps: just refresh window handles + dots
+      for (const el of itemEls) if (el._group) el._group = groups.find((g) => g.key === el._group.key) || el._group;
+      updateRunning();
+    }
   });
 
   frost.on('running', (list) => {

@@ -25,6 +25,7 @@
       aboveTaskbar: true,
       margin: 10,
       iconStyle: q.get('icons') || 'square',
+      showRunning: true,
       items: [
         { name: 'File Explorer', path: 'folder', process: false },
         { name: 'Browser', path: 'globe' },
@@ -111,6 +112,10 @@
       media,
       stats: { cpu: 0.23, mem: 0.58 },
       running: ['globe', 'terminal', 'music'],
+      windows: q.has('nowin') ? [] : [
+        { key: 'p:discord', name: 'Discord', path: 'Messages', exe: 'Discord.exe', hwnds: [101] },
+        { key: 'p:mail', name: 'Outlook', path: 'Mail', exe: 'olk.exe', hwnds: [102, 103] },
+      ],
       notifications: [
         { id: 'n1', app: 'Mail', appName: 'Mail', time: Date.now() - 42 * 60e3, title: 'Invoice #2291 paid', body: 'Payment received. Thanks for your business!' },
         { id: 'n2', app: 'Calendar', appName: 'Calendar', time: Date.now() - 3 * 3600e3, title: 'Design review in 10 min', body: 'Room 4B · with Dimas, Sarah' },
@@ -146,6 +151,10 @@
     browseApps: async () => [],
     openSettingsWindow: () => {},
     setFocusable: () => {},
+    runningMenu: (k) => console.log('[mock] running menu', k),
+    winActivate: (h) => console.log('[mock] activate', h),
+    winClose: (h) => console.log('[mock] close', h),
+    pin: (k) => console.log('[mock] pin', k),
     media: (cmd) => {
       if (cmd === 'toggle') media = { ...media, playing: !media.playing };
       else media = { ...media, key: String(Math.random()), title: cmd === 'next' ? 'Midnight Frost' : 'Soft Focus', artist: 'Neon Drift', position: 0 };

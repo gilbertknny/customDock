@@ -189,3 +189,19 @@ body.autohide.hidden #dock-wrap {
 body.drop-target #dock-bg::after {
   box-shadow: inset 0 0 0 2px var(--accent), 0 0 24px var(--accent);
 }
+
+/* running apps that aren't pinned pop in/out like macOS */
+.item.appear {
+  animation: appear 0.45s cubic-bezier(0.34, 1.4, 0.5, 1);
+}
+@keyframes appear {
+  from {
+    width: 0;
+    opacity: 0;
+    transform: scale(0.3);
+  }
+}
+.sep.auto {
+  opacity: 0.55;
+  height: calc(var(--icon) * 0.5);
+}

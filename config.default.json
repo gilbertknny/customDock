@@ -17,6 +17,7 @@
     "aboveTaskbar": true,
     "margin": 10,
     "hideTaskbar": false,
+    "showRunning": true,
     "items": [
       { "name": "File Explorer", "path": "%WINDIR%\\explorer.exe", "process": false },
       { "name": "Microsoft Edge", "path": "%ProgramFiles(x86)%\\Microsoft\\Edge\\Application\\msedge.exe" },

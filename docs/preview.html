@@ -1,0 +1,87 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>FrostShell — live preview</title>
+    <style>
+      html,
+      body {
+        margin: 0;
+        height: 100%;
+        overflow: hidden;
+        background: #111 url("../assets/demo-wallpaper.jpg") center / cover no-repeat;
+        font-family: "Segoe UI", system-ui, sans-serif;
+      }
+      iframe {
+        position: absolute;
+        border: 0;
+        background: transparent;
+      }
+      #bar {
+        position: absolute;
+        right: 16px;
+        top: 50%;
+        transform: translateY(-50%);
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
+      #bar button {
+        padding: 8px 14px;
+        border-radius: 10px;
+        border: 1px solid rgba(255, 255, 255, 0.3);
+        background: rgba(0, 0, 0, 0.35);
+        color: #fff;
+        font: 600 12px inherit;
+        backdrop-filter: blur(10px);
+        cursor: pointer;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="bar">
+      <button data-a="expand">Expand island</button>
+      <button data-a="collapse">Collapse island</button>
+      <button data-a="charge">Charging activity</button>
+      <button data-a="theme">Toggle light/dark</button>
+      <button data-a="black">Toggle black island</button>
+    </div>
+    <script>
+      const p = new URLSearchParams(location.search);
+      let theme = p.get('theme') || 'dark';
+      let style = p.get('style') || 'glass';
+      function mount() {
+        document.querySelectorAll('iframe').forEach((f) => f.remove());
+        const W = innerWidth, H = innerHeight;
+        const common = `sw=${W}&sh=${H}&theme=${theme}&style=${style}&wallpaper=../../../assets/demo-wallpaper.jpg`;
+        const island = document.createElement('iframe');
+        Object.assign(island.style, { left: `${(W - 620) / 2}px`, top: '0px', width: '620px', height: '320px' });
+        island.src = `../src/renderer/island/index.html?${common}&x=${(W - 620) / 2}&y=0`;
+        island.id = 'island';
+        const dock = document.createElement('iframe');
+        Object.assign(dock.style, { left: '0px', top: `${H - 193}px`, width: `${W}px`, height: '193px' });
+        dock.src = `../src/renderer/dock/index.html?${common}&x=0&y=${H - 193}`;
+        dock.id = 'dock';
+        document.body.append(island, dock);
+        island.onload = () => {
+          const s = p.get('state');
+          const api = () => island.contentWindow.__island;
+          const wait = (fn) => (api() ? fn(api()) : setTimeout(() => wait(fn), 50));
+          if (s === 'expanded') wait((a) => a.setHover(true));
+          if (s === 'activity') wait((a) => a.showActivity({ icon: 'bolt', color: '#4ade80', sub: 'Power connected', title: 'Charging', right: '76%' }, 1e9));
+        };
+      }
+      document.getElementById('bar').addEventListener('click', (e) => {
+        const a = e.target.dataset.a;
+        const api = document.getElementById('island').contentWindow.__island;
+        if (a === 'expand') api.setHover(true);
+        if (a === 'collapse') api.setHover(false);
+        if (a === 'charge') api.showActivity({ icon: 'bolt', color: '#4ade80', sub: 'Power connected', title: 'Charging', right: '76%', pulse: true });
+        if (a === 'theme') (theme = theme === 'dark' ? 'light' : 'dark'), mount();
+        if (a === 'black') (style = style === 'black' ? 'glass' : 'black'), mount();
+      });
+      if (p.has('clean')) document.getElementById('bar').remove();
+      mount();
+    </script>
+  </body>
+</html>

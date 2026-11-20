@@ -1,0 +1,164 @@
+:root {
+  --icon: 50px;
+  --margin: 10px;
+  --pad: 8px;
+}
+
+#dock-wrap {
+  position: absolute;
+  left: 50%;
+  bottom: var(--margin);
+  transform: translateX(-50%);
+  transition: transform 0.5s cubic-bezier(0.22, 1, 0.36, 1);
+  display: flex;
+  align-items: flex-end;
+  padding: 0 var(--pad);
+}
+
+body.autohide.hidden #dock-wrap {
+  transform: translate(-50%, calc(100% + var(--margin) + 6px));
+}
+
+#dock-bg {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: calc(var(--icon) + var(--pad) * 2);
+  --radius: calc(var(--icon) * 0.36 + var(--pad));
+}
+
+#items {
+  position: relative;
+  display: flex;
+  align-items: flex-end;
+  gap: 6px;
+  padding: var(--pad) 2px;
+}
+
+.item {
+  position: relative;
+  flex: none;
+  width: calc(var(--icon) * var(--s, 1));
+  height: calc(var(--icon) * var(--s, 1));
+  transition: width 0.18s cubic-bezier(0.25, 1, 0.5, 1), height 0.18s cubic-bezier(0.25, 1, 0.5, 1);
+}
+.magnifying .item {
+  transition-duration: 0.06s;
+}
+
+.tile {
+  width: 100%;
+  height: 100%;
+  display: grid;
+  place-items: center;
+  filter: drop-shadow(0 6px 10px rgba(0, 0, 0, 0.28));
+  transition: transform 0.2s, filter 0.2s;
+}
+.tile img {
+  width: 88%;
+  height: 88%;
+  object-fit: contain;
+  image-rendering: -webkit-optimize-contrast;
+}
+.tile svg {
+  width: 100%;
+  height: 100%;
+}
+.item:active .tile {
+  filter: drop-shadow(0 6px 10px rgba(0, 0, 0, 0.28)) brightness(0.75);
+}
+
+.item::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  bottom: -6px;
+  width: 4px;
+  height: 4px;
+  margin-left: -2px;
+  border-radius: 50%;
+  background: var(--fg);
+  box-shadow: 0 0 6px var(--fg);
+  opacity: 0;
+  transform: scale(0.4);
+  transition: opacity 0.25s, transform 0.25s;
+}
+.item.running::after {
+  opacity: 0.85;
+  transform: scale(1);
+}
+
+.item.bounce .tile {
+  animation: bounce 0.9s cubic-bezier(0.3, 0, 0.3, 1) 2;
+}
+@keyframes bounce {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  40% {
+    transform: translateY(-38%);
+  }
+  70% {
+    transform: translateY(0);
+  }
+  80% {
+    transform: translateY(-8%);
+  }
+}
+
+.item.drag-over::before {
+  content: "";
+  position: absolute;
+  left: -5px;
+  top: 10%;
+  bottom: 10%;
+  width: 3px;
+  border-radius: 3px;
+  background: var(--accent);
+}
+
+.sep {
+  flex: none;
+  align-self: center;
+  width: 1px;
+  height: calc(var(--icon) * 0.7);
+  margin: 0 5px;
+  background: var(--fg-faint);
+  box-shadow: 1px 0 0 rgba(255, 255, 255, 0.12);
+}
+
+#hot {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 4px;
+}
+
+#tip {
+  position: absolute;
+  padding: 5px 11px;
+  border-radius: 9px;
+  font-size: 12.5px;
+  font-weight: 500;
+  white-space: nowrap;
+  color: var(--fg);
+  background: rgba(var(--tint-rgb), 0.72);
+  box-shadow: inset 0 0 0 1px var(--rim), 0 8px 24px -8px var(--shadow);
+  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
+  transform: translate(-50%, 4px);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.15s, transform 0.15s;
+}
+#tip.show {
+  opacity: 1;
+  transform: translate(-50%, 0);
+}
+
+body.drop-target #dock-bg::after {
+  box-shadow: inset 0 0 0 2px var(--accent), 0 0 24px var(--accent);
+}

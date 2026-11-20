@@ -1,0 +1,43 @@
+{
+  "theme": "auto",
+  "glass": {
+    "mode": "wallpaper",
+    "blur": 26,
+    "saturation": 1.8,
+    "tint": 0.22,
+    "border": 0.28,
+    "noise": 0.05
+  },
+  "dock": {
+    "enabled": true,
+    "iconSize": 50,
+    "magnification": 1.65,
+    "autoHide": false,
+    "aboveTaskbar": true,
+    "margin": 10,
+    "items": [
+      { "name": "File Explorer", "path": "%WINDIR%\\explorer.exe", "process": false },
+      { "name": "Microsoft Edge", "path": "%ProgramFiles(x86)%\\Microsoft\\Edge\\Application\\msedge.exe" },
+      { "name": "Terminal", "path": "%LOCALAPPDATA%\\Microsoft\\WindowsApps\\wt.exe", "icon": "builtin:terminal", "process": "WindowsTerminal.exe" },
+      { "name": "Notepad", "path": "%WINDIR%\\System32\\notepad.exe", "process": "Notepad.exe" },
+      { "name": "Calculator", "path": "calculator:", "icon": "builtin:calculator", "process": "CalculatorApp.exe" },
+      { "name": "Settings", "path": "ms-settings:", "icon": "builtin:settings", "process": "SystemSettings.exe" },
+      { "type": "separator" },
+      { "name": "Recycle Bin", "path": "explorer.exe", "args": ["shell:RecycleBinFolder"], "icon": "builtin:trash", "process": false }
+    ]
+  },
+  "island": {
+    "enabled": true,
+    "style": "glass",
+    "clock24h": true,
+    "showSeconds": false,
+    "expandOnHover": true,
+    "activityDuration": 3500,
+    "quickActions": [
+      { "label": "Snip", "icon": "scissors", "uri": "ms-screenclip:" },
+      { "label": "Timer 5m", "icon": "timer", "action": "timer", "minutes": 5 },
+      { "label": "Lock", "icon": "lock", "path": "rundll32.exe", "args": ["user32.dll,LockWorkStation"] },
+      { "label": "Settings", "icon": "gear", "uri": "ms-settings:" }
+    ]
+  }
+}

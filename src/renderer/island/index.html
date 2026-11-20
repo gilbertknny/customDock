@@ -1,0 +1,76 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; img-src 'self' data: frost: file:; style-src 'self' 'unsafe-inline'; script-src 'self'"
+    />
+    <title>FrostShell Island</title>
+    <link rel="stylesheet" href="../shared/glass.css" />
+    <link rel="stylesheet" href="island.css" />
+  </head>
+  <body class="theme-dark">
+    <div id="island" class="glass s-compact" data-hit>
+      <!-- compact pill -->
+      <section class="view compact">
+        <div class="c-left">
+          <img class="art-sm" alt="" />
+          <span class="dot"></span>
+        </div>
+        <div class="c-time"></div>
+        <div class="c-right">
+          <span class="c-timer"></span>
+          <div class="eq"><i></i><i></i><i></i><i></i></div>
+          <span class="c-batt"></span>
+        </div>
+      </section>
+
+      <!-- live activity (track change, charging, timer) -->
+      <section class="view activity">
+        <div class="a-icon"></div>
+        <div class="a-text">
+          <span class="a-sub"></span>
+          <b class="a-title"></b>
+        </div>
+        <div class="a-right"></div>
+      </section>
+
+      <!-- expanded panel -->
+      <section class="view expanded">
+        <header class="x-top">
+          <div class="x-clock">
+            <div class="x-time"></div>
+            <div class="x-date"></div>
+          </div>
+          <div class="x-stats">
+            <div class="ring" data-k="cpu"><svg viewBox="0 0 36 36"><circle class="track" cx="18" cy="18" r="15" /><circle class="val" cx="18" cy="18" r="15" /></svg><span></span><small>CPU</small></div>
+            <div class="ring" data-k="mem"><svg viewBox="0 0 36 36"><circle class="track" cx="18" cy="18" r="15" /><circle class="val" cx="18" cy="18" r="15" /></svg><span></span><small>RAM</small></div>
+            <div class="ring" data-k="bat"><svg viewBox="0 0 36 36"><circle class="track" cx="18" cy="18" r="15" /><circle class="val" cx="18" cy="18" r="15" /></svg><span></span><small>BAT</small></div>
+          </div>
+        </header>
+
+        <div class="x-media">
+          <div class="art-lg"><img alt="" /></div>
+          <div class="meta">
+            <div class="m-title"></div>
+            <div class="m-artist"></div>
+            <div class="progress"><div class="bar"><i></i></div><span class="t-pos"></span><span class="t-dur"></span></div>
+          </div>
+          <div class="controls">
+            <button class="icon-btn" data-media="prev" title="Previous"></button>
+            <button class="icon-btn big" data-media="toggle" title="Play / Pause"></button>
+            <button class="icon-btn" data-media="next" title="Next"></button>
+          </div>
+        </div>
+
+        <div class="x-actions"></div>
+      </section>
+    </div>
+
+    <script src="../shared/mock.js"></script>
+    <script src="../shared/icons.js"></script>
+    <script src="../shared/ui.js"></script>
+    <script src="island.js"></script>
+  </body>
+</html>

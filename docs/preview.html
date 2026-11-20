@@ -43,6 +43,8 @@
       <button data-a="expand">Expand notch</button>
       <button data-a="collapse">Collapse notch</button>
       <button data-a="notify">New notification</button>
+      <button data-a="vol">Volume key</button>
+      <button data-a="bri">Brightness key</button>
       <button data-a="charge">Charging activity</button>
       <button data-a="theme">Toggle light/dark</button>
       <button data-a="black">Toggle black notch</button>
@@ -52,6 +54,8 @@
       let theme = p.get('theme') || 'dark';
       let style = p.get('style') || 'glass';
       let ni = 0;
+      let vol = 0.4;
+      let bri = 0.5;
       function sample() {
         const s = [
           { app: 'Messages', title: 'Kevin', body: 'Bro, push repo-nya udah? Mau gue test di laptop kantor 🙏' },
@@ -81,6 +85,8 @@
           if (s === 'notifs') wait((a) => (a.setHover(true), a.selectTab('notifs')));
           if (s === 'controls') wait((a) => (a.setHover(true), a.selectTab('controls')));
           if (s === 'toast') wait((a) => a.notify(sample()));
+          if (s === 'osd') wait((a) => { a.osd({ kind: 'volume', value: 0.64, muted: false }); setInterval(() => a.osd({ kind: 'volume', value: 0.64, muted: false }), 1200); });
+          if (s === 'osd-bri') wait((a) => { a.osd({ kind: 'brightness', value: 0.8 }); setInterval(() => a.osd({ kind: 'brightness', value: 0.8 }), 1200); });
           if (s === 'activity') wait((a) => a.showActivity({ icon: 'bolt', color: '#4ade80', sub: 'Power connected', title: 'Charging', right: '76%' }, 1e9));
         };
       }
@@ -90,6 +96,8 @@
         if (a === 'expand') api.setHover(true);
         if (a === 'collapse') api.setHover(false);
         if (a === 'notify') api.notify(sample());
+        if (a === 'vol') api.osd({ kind: 'volume', value: (vol = (vol + 0.1) % 1.05), muted: false });
+        if (a === 'bri') api.osd({ kind: 'brightness', value: (bri = (bri + 0.15) % 1.05) });
         if (a === 'charge') api.showActivity({ icon: 'bolt', color: '#4ade80', sub: 'Power connected', title: 'Charging', right: '76%', pulse: true });
         if (a === 'theme') (theme = theme === 'dark' ? 'light' : 'dark'), mount();
         if (a === 'black') (style = style === 'black' ? 'glass' : 'black'), mount();

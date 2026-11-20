@@ -30,6 +30,7 @@ A MacBook-style notch that hangs from the top edge of the screen: square top, ro
   - **Controls**: ☀️ brightness · 🔊 volume (scroll wheel works) · 🔇 mute · 📶 Wi-Fi · 🦷 Bluetooth · modes **Normal / Airplane / Low power / Focus**. Right-click any control to open its Windows Settings page
   - **Notifications**: everything in Windows Notification Center, grouped by day, with app icons, *open*, *dismiss* and *clear all*
 - **Media controls** for anything in Windows' media flyout (Spotify, YouTube in Chrome/Edge, Apple Music, VLC…), via the native SMTC API
+- **Volume & brightness OSD**: press the keyboard keys and the notch shows a sleek level bar instead of hunting for Windows' flyout (and the Controls tab stays in sync)
 - **Live activities** that morph the notch: 🎵 track changed · ⚡ charger plugged/unplugged · ⏱️ timer with countdown + chime · ✈️/🌙 mode changes
 - **Spring physics** between every state; corner and ear radii animate with the size
 
@@ -50,6 +51,8 @@ A MacBook-style notch that hangs from the top edge of the screen: square top, ro
 - **Launch bounce** animation
 - **Drag to reorder**, right-click → *Add app…*, *Remove*, *Show file location*, *Add separator*
 - **Auto-hide** with a bottom hot-edge
+- **Hide the Windows taskbar** (tray → *Hide Windows taskbar*): no more double bar. It always comes back when FrostShell quits, even after a crash
+- **Steps aside for fullscreen**: dock and notch hide during games, fullscreen video and presentations
 - Supports `.exe`, `.lnk`, URIs (`ms-settings:`, `spotify:`…) and custom args
 
 ### 🧊 Glassmorphism done properly
@@ -93,7 +96,8 @@ npm run dist       # build installer + portable exe into dist/
 Requires **Node.js 20+** and **Windows 10 1809+ / Windows 11** (best on 11).
 
 ### Recommended Windows settings
-- **Auto-hide the taskbar** (Settings → Personalization → Taskbar → Taskbar behaviors) so the dock can sit at the very bottom, then set `"aboveTaskbar": false`.
+- Turn on **Hide Windows taskbar** from the FrostShell tray menu so the dock is the only bar.
+- **Smart App Control** (Windows 11) blocks unsigned apps, including Electron itself. If `npm start` fails with `spawn UNKNOWN`, that's why: turn it off in *Windows Security → App & browser control*, or use a signed build.
 - Turn on **Start with Windows** from the FrostShell tray menu.
 
 ---
@@ -105,6 +109,7 @@ Everything lives in `%APPDATA%\FrostShell\config.json` (tray → *Edit config…
 ```jsonc
 {
   "theme": "auto",                 // auto | dark | light
+  "hideOnFullscreen": true,        // hide dock + notch over fullscreen apps/games
   "glass": {
     "mode": "wallpaper",           // wallpaper | tint
     "blur": 26,                    // px
@@ -120,6 +125,7 @@ Everything lives in `%APPDATA%\FrostShell\config.json` (tray → *Edit config…
     "autoHide": false,
     "aboveTaskbar": true,
     "margin": 10,
+    "hideTaskbar": false,          // hide the Windows taskbar while FrostShell runs
     "iconStyle": "square",         // square (uniform plate) | plain
     "items": [
       { "name": "Edge", "path": "%ProgramFiles(x86)%\\Microsoft\\Edge\\Application\\msedge.exe" },
@@ -138,6 +144,7 @@ Everything lives in `%APPDATA%\FrostShell\config.json` (tray → *Edit config…
     "showSeconds": false,
     "expandOnHover": true,         // false = click to expand
     "activityDuration": 3500,
+    "osd": true,                   // volume/brightness key OSD in the notch
     "notifications": {
       "enabled": true,
       "popup": true,               // false = badge only, never drop down
@@ -208,6 +215,7 @@ src/
 │   ├── icons.ps1/.js    # native Windows icon extraction (exe/dll + Store apps)
 │   ├── controls.ps1/.js # volume, brightness, radios, power mode, focus
 │   ├── notifications.js # mirrors Windows Notification Center (read-only)
+│   ├── shellwatch.ps1/.js # fullscreen detection, volume/brightness keys, taskbar hiding
 │   ├── wallpaper.js     # finds & watches the current wallpaper
 │   ├── processes.js     # running-app detection (tasklist)
 │   └── stats.js         # CPU / RAM
@@ -226,9 +234,7 @@ src/
 ## 🗺️ Roadmap
 - [ ] Multi-monitor (dock per display)
 - [ ] Left/right dock positions
-- [ ] Hide over fullscreen apps & games
 - [ ] Inline reply / toast action buttons
-- [ ] Volume / brightness OSD replacement (show hardware-key changes in the notch)
 - [ ] Wi-Fi network picker
 - [ ] Native acrylic/mica mode (blur real windows, not only the wallpaper)
 - [ ] Settings GUI
@@ -244,7 +250,7 @@ PRs are very welcome!
 
 - **Notch**: nempel di tepi atas layar, mengecil pas diam dan membesar saat kursor mendekat. Hover buat buka panel dengan 3 tab: **Home** (jam, musik, CPU/RAM/baterai), **Controls** (kecerahan, volume, mute, WiFi, Bluetooth, mode Normal / Airplane / Low power / Focus), dan **Notifications** (semua notifikasi Windows).
 - **Notifikasi baru** turun dari notch sebagai toast selama 6 detik. Hover buat nahan dan muncul tombol Open/Dismiss. Kalau kelewat, ada badge merah di notch, dan pas di-hover langsung kebuka di tab Notifications. Kalau mode Focus nyala, cuma badge aja tanpa pop-up.
-- **Dock**: efek magnify, ikon asli bawaan Windows (diseragamkan di atas alas kotak), indikator app yang lagi jalan, drag buat ngatur urutan, auto-hide.
+- **Dock**: bisa nyembunyiin taskbar Windows (tray → *Hide Windows taskbar*), otomatis sembunyi pas ada app fullscreen, efek magnify, ikon asli bawaan Windows (diseragamkan di atas alas kotak), indikator app yang lagi jalan, drag buat ngatur urutan, auto-hide.
 - **Glass beneran**: wallpaper kamu di-blur di belakang tiap panel, jadi efek kacanya kelihatan nyata, bukan cuma kotak transparan.
 
 Cara pakai: `npm install` lalu `npm start`. Pengaturan ada di `%APPDATA%\FrostShell\config.json` (klik kanan ikon tray → *Edit config…*). Saran: nyalakan *auto-hide taskbar* Windows biar dock-nya bisa nempel di bawah.

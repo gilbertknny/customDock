@@ -1,7 +1,7 @@
 // Minimal, explicit bridge between renderers and the main process.
 const { contextBridge, ipcRenderer, webUtils } = require('electron');
 
-const CHANNELS = ['config', 'media', 'stats', 'running', 'wallpaper', 'geometry', 'notifications'];
+const CHANNELS = ['config', 'media', 'stats', 'running', 'wallpaper', 'geometry', 'notifications', 'osd'];
 
 contextBridge.exposeInMainWorld('frost', {
   init: () => ipcRenderer.invoke('init'),

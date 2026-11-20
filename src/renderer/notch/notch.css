@@ -42,6 +42,12 @@
   --ear: 14px;
   --r: 22px;
 }
+#notch.s-osd {
+  width: 300px;
+  height: 46px;
+  --ear: 14px;
+  --r: 20px;
+}
 #notch.s-toast {
   width: 400px;
   height: var(--th, 96px);
@@ -130,6 +136,7 @@
   transition: opacity 0.25s, filter 0.3s, transform 0.16s ease-out;
 }
 .s-activity .activity,
+.s-osd .osd,
 .s-toast .toast,
 .s-expanded .expanded {
   opacity: 1;
@@ -1097,4 +1104,52 @@
 }
 .x-latest:empty {
   display: none;
+}
+
+/* ---------- OSD (volume / brightness keys) ---------- */
+.osd {
+  width: 300px;
+  height: 46px;
+  display: grid;
+  grid-template-columns: 30px 1fr 40px;
+  align-items: center;
+  gap: 10px;
+  padding: 0 16px 2px 14px;
+}
+.o-icon {
+  display: grid;
+  place-items: center;
+  color: var(--o-color, var(--fg));
+}
+.o-icon svg {
+  width: 20px;
+  height: 20px;
+}
+.o-bar {
+  height: 6px;
+  border-radius: 6px;
+  background: var(--fg-faint);
+  overflow: hidden;
+}
+.o-bar i {
+  display: block;
+  height: 100%;
+  width: calc(var(--v, 0) * 100%);
+  border-radius: inherit;
+  background: var(--o-fill, var(--fg));
+  transition: width 0.18s ease-out;
+}
+.osd.muted .o-bar i {
+  background: var(--fg-dim);
+}
+.osd.brightness {
+  --o-color: #ffc95c;
+  --o-fill: linear-gradient(90deg, #ffb347, #ffd76a);
+}
+.o-val {
+  text-align: right;
+  font-size: 12px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--fg-dim);
 }

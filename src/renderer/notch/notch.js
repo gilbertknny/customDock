@@ -17,6 +17,8 @@
   let timer = null; // { end, minutes }
   let battery = null;
   let state = 'compact';
+  let osd = null; // { kind, value, muted } while the volume/brightness OSD is up
+  let osdTimer = null;
 
   ui.glassify(panel);
   ui.boot(init, {
@@ -73,7 +75,7 @@
   // ---------- state machine ----------
   function setState() {
     const expand = (hover && cfg.notch.expandOnHover) || pinned;
-    const s = notif.current ? 'toast' : expand ? 'expanded' : activity ? 'activity' : 'compact';
+    const s = notif.current ? 'toast' : expand ? 'expanded' : osd ? 'osd' : activity ? 'activity' : 'compact';
     const entering = s !== state;
     state = s;
     island.classList.remove('s-compact', 's-activity', 's-toast', 's-expanded');
@@ -490,6 +492,7 @@
     const job = cc.send[name] || (cc.send[name] = { busy: false, next: null });
     job.next = value;
     if (job.busy) return;
+    cc.localAt = Date.now();
     const pump = async () => {
       if (job.next === null) return void (job.busy = false);
       job.busy = true;
@@ -536,6 +539,7 @@
     e.preventDefault();
     if (!cc.state) return;
     const muted = !cc.state.muted;
+    cc.localAt = Date.now();
     optimistic({ muted });
     ccRun({ cmd: 'setMute', value: muted });
   };
@@ -830,6 +834,34 @@
   frost.on('notifications', onNotifications);
   setInterval(() => state !== 'expanded' && renderList(), 60000); // refresh relative times
 
+  // ---------- OSD: volume / brightness changed by hardware keys ----------
+  const osdEl = $('.osd');
+  function onOsd(p) {
+    if (!p) return;
+    // keep the Controls tab in sync no matter where the change came from
+    if (cc.state) {
+      if (p.kind === 'volume') renderCc({ ...cc.state, volume: p.value, muted: p.muted });
+      else renderCc({ ...cc.state, brightness: Math.round(p.value * 100) });
+    }
+    if (cfg.notch.osd === false) return;
+    if (Date.now() - (cc.localAt || 0) < 1500) return; // our own slider/mute did this
+    if (state === 'expanded' || state === 'toast') return; // already visible / busy
+    osd = p;
+    const muted = p.kind === 'volume' && (p.muted || p.value === 0);
+    osdEl.classList.toggle('brightness', p.kind === 'brightness');
+    osdEl.classList.toggle('muted', muted);
+    $('.o-icon').innerHTML = Icons.glyph(p.kind === 'brightness' ? 'sun' : muted ? 'muted' : p.value < 0.5 ? 'volumeLow' : 'volume');
+    $('.o-bar').style.setProperty('--v', Math.max(0, Math.min(1, p.value)).toFixed(3));
+    $('.o-val').textContent = muted ? 'Muted' : `${Math.round(p.value * 100)}%`;
+    setState();
+    clearTimeout(osdTimer);
+    osdTimer = setTimeout(() => {
+      osd = null;
+      setState();
+    }, 1600);
+  }
+  frost.on('osd', onOsd);
+
   // ---------- boot ----------
   applyStyle();
   renderActions();
@@ -844,6 +876,7 @@
   window.__notch = {
     showActivity,
     setHover: (v) => ((pinned = v), setState()),
+    osd: onOsd,
     selectTab,
     notify: (n) => onNotifications({ list: [n, ...notif.list], fresh: [n] }),
   };

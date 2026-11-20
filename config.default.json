@@ -1,5 +1,6 @@
 {
   "theme": "auto",
+  "hideOnFullscreen": true,
   "glass": {
     "mode": "wallpaper",
     "blur": 26,
@@ -15,6 +16,7 @@
     "autoHide": false,
     "aboveTaskbar": true,
     "margin": 10,
+    "hideTaskbar": false,
     "items": [
       { "name": "File Explorer", "path": "%WINDIR%\\explorer.exe", "process": false },
       { "name": "Microsoft Edge", "path": "%ProgramFiles(x86)%\\Microsoft\\Edge\\Application\\msedge.exe" },
@@ -36,6 +38,7 @@
     "showSeconds": false,
     "expandOnHover": true,
     "activityDuration": 3500,
+    "osd": true,
     "notifications": {
       "enabled": true,
       "popup": true,

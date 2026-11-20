@@ -11,14 +11,22 @@ const WINDIR = process.env.WINDIR || 'C:\\Windows';
 const GENERIC = { kind: 'file', file: `${WINDIR}\\System32\\imageres.dll`, index: -15 }; // generic application icon
 
 // Windows URIs / shell folders whose icon lives somewhere predictable.
+const SETTINGS_AUMID = 'windows.immersivecontrolpanel_cw5n1h2txyewy!microsoft.windows.immersivecontrolpanel';
 const KNOWN = {
   'ms-settings:': [
+    { kind: 'shell', path: `shell:AppsFolder\\${SETTINGS_AUMID}` },
     { kind: 'appx', family: 'windows.immersivecontrolpanel_cw5n1h2txyewy' },
     { kind: 'file', file: `${WINDIR}\\ImmersiveControlPanel\\SystemSettings.exe`, index: 0 },
   ],
-  'calculator:': [{ kind: 'appx', family: 'Microsoft.WindowsCalculator_8wekyb3d8bbwe' }],
+  'calculator:': [
+    { kind: 'shell', path: 'shell:AppsFolder\\Microsoft.WindowsCalculator_8wekyb3d8bbwe!App' },
+    { kind: 'appx', family: 'Microsoft.WindowsCalculator_8wekyb3d8bbwe' },
+  ],
   'ms-screenclip:': [{ kind: 'appx', family: 'Microsoft.ScreenSketch_8wekyb3d8bbwe' }],
-  'shell:recyclebinfolder': [{ kind: 'file', file: `${WINDIR}\\System32\\imageres.dll`, index: -55 }],
+  'shell:recyclebinfolder': [
+    { kind: 'shell', path: 'shell:RecycleBinFolder' },
+    { kind: 'file', file: `${WINDIR}\\System32\\imageres.dll`, index: -55 },
+  ],
   'shell:mycomputerfolder': [{ kind: 'file', file: `${WINDIR}\\System32\\imageres.dll`, index: -109 }],
   'shell:downloads': [{ kind: 'file', file: `${WINDIR}\\System32\\imageres.dll`, index: -184 }],
 };
@@ -69,8 +77,12 @@ function candidates(item) {
 
   const appsFolder = target.match(/^shell:appsfolder\\(.+)$/i);
   if (appsFolder) {
+    // Explorer's own icon for the Start entry works for Store *and* Win32 apps
+    list.push({ kind: 'shell', path: target });
     const [family, appId] = appsFolder[1].split('!');
-    list.push({ kind: 'appx', family, app: appId });
+    if (family.includes('_')) list.push({ kind: 'appx', family, app: appId });
+  } else if (/^shell:/i.test(target) && !KNOWN[lower]) {
+    list.push({ kind: 'shell', path: target });
   }
 
   if (path.isAbsolute(target)) {
@@ -84,6 +96,7 @@ function candidates(item) {
     const fam = aliasFamily(target);
     if (fam) list.push({ kind: 'appx', family: fam });
     list.push({ kind: 'file', file: target, index: 0 });
+    list.push({ kind: 'shell', path: target }); // folders, documents, anything else
   }
   return list;
 }

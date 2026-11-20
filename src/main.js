@@ -25,6 +25,7 @@ const wallpaper = require('./system/wallpaper');
 const icons = require('./system/icons');
 const controls = require('./system/controls');
 const notifications = require('./system/notifications');
+const shellwatch = require('./system/shellwatch');
 
 const DEMO = process.argv.includes('--demo');
 const ASSETS = path.join(__dirname, '..', 'assets');
@@ -44,6 +45,7 @@ app.commandLine.appendSwitch('disable-features', 'CalculateNativeWinOcclusion');
 
 const windows = { dock: null, notch: null };
 let tray = null;
+let hiddenForFullscreen = false;
 
 // ---------- helpers ----------
 
@@ -128,7 +130,7 @@ function baseOptions(extra) {
 
 function dockBounds(cfg) {
   const d = primary();
-  const area = cfg.dock.aboveTaskbar && !cfg.dock.autoHide ? d.workArea : d.bounds;
+  const area = cfg.dock.aboveTaskbar && !cfg.dock.autoHide && !cfg.dock.hideTaskbar ? d.workArea : d.bounds;
   const height = Math.ceil(cfg.dock.iconSize * cfg.dock.magnification + 110);
   return { x: d.bounds.x, y: area.y + area.height - height, width: d.bounds.width, height };
 }
@@ -148,7 +150,7 @@ function createWindow(kind, bounds) {
   win.webContents.on('will-navigate', (e) => e.preventDefault());
   win.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
   win.loadFile(path.join(__dirname, 'renderer', kind, 'index.html'));
-  win.once('ready-to-show', () => win.showInactive());
+  win.once('ready-to-show', () => !hiddenForFullscreen && win.showInactive());
   win.on('closed', () => (windows[kind] = null));
   if (process.argv.includes('--devtools')) win.webContents.openDevTools({ mode: 'detach' });
   return win;
@@ -164,7 +166,20 @@ function applyConfig(cfg) {
     else if (w) w.setBounds(bounds[kind]());
   }
   broadcast('config', payloadConfig(cfg));
+  shellwatch.setHideTaskbar(!!cfg.dock.hideTaskbar);
+  setFullscreenHidden(cfg.hideOnFullscreen !== false && shellwatch.fullscreen);
   rebuildTray();
+}
+
+// Get out of the way of games, fullscreen video and presentations.
+function setFullscreenHidden(hide) {
+  if (hide === hiddenForFullscreen) return;
+  hiddenForFullscreen = hide;
+  for (const w of Object.values(windows)) {
+    if (!w || w.isDestroyed()) continue;
+    if (hide) w.hide();
+    else w.showInactive();
+  }
 }
 
 function payloadConfig(cfg) {
@@ -336,6 +351,18 @@ function rebuildTray() {
       { label: 'Notch', type: 'checkbox', checked: cfg.notch.enabled, click: set((c) => (c.notch.enabled = !c.notch.enabled)) },
       { label: 'Auto-hide dock', type: 'checkbox', checked: cfg.dock.autoHide, click: set((c) => (c.dock.autoHide = !c.dock.autoHide)) },
       { label: 'Add app to dock…', click: addAppDialog },
+      {
+        label: 'Hide Windows taskbar',
+        type: 'checkbox',
+        checked: !!cfg.dock.hideTaskbar,
+        click: set((c) => (c.dock.hideTaskbar = !c.dock.hideTaskbar)),
+      },
+      {
+        label: 'Hide over fullscreen apps',
+        type: 'checkbox',
+        checked: cfg.hideOnFullscreen !== false,
+        click: set((c) => (c.hideOnFullscreen = c.hideOnFullscreen === false)),
+      },
       { type: 'separator' },
       {
         label: 'Notch style',
@@ -398,11 +425,14 @@ app.whenReady().then(() => {
   media.start({ demo: DEMO });
   controls.start({ demo: DEMO });
   notifications.start({ demo: DEMO });
+  shellwatch.start({ hideTaskbar: !!cfg.dock.hideTaskbar });
   processes.start();
   stats.start();
 
   media.on('update', (s) => broadcast('media', s));
   notifications.on('update', (p) => broadcast('notifications', p));
+  shellwatch.on('fullscreen', (fs) => setFullscreenHidden(config.get().hideOnFullscreen !== false && fs));
+  shellwatch.on('level', (p, first) => !first && broadcast('osd', p)); // hardware keys -> notch OSD
   processes.on('update', (list) => broadcast('running', list));
   stats.on('update', (s) => broadcast('stats', s));
   wallpaper.on('update', (url) => broadcast('wallpaper', url));
@@ -430,6 +460,7 @@ app.on('will-quit', () => {
   media.stop();
   controls.stop();
   notifications.stop();
+  shellwatch.stop(); // restores the Windows taskbar if we hid it
   processes.stop();
   stats.stop();
   wallpaper.stop();

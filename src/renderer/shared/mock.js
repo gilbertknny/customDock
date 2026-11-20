@@ -42,6 +42,7 @@
       enabled: true,
       style: q.get('style') || 'glass',
       idleScale: 0.75,
+      osd: true,
       notifications: { enabled: true, popup: true, duration: 6000, max: 50 },
       proximity: 240,
       clock24h: true,

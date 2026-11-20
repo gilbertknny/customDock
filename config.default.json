@@ -18,13 +18,14 @@
     "items": [
       { "name": "File Explorer", "path": "%WINDIR%\\explorer.exe", "process": false },
       { "name": "Microsoft Edge", "path": "%ProgramFiles(x86)%\\Microsoft\\Edge\\Application\\msedge.exe" },
-      { "name": "Terminal", "path": "%LOCALAPPDATA%\\Microsoft\\WindowsApps\\wt.exe", "icon": "builtin:terminal", "process": "WindowsTerminal.exe" },
-      { "name": "Notepad", "path": "%WINDIR%\\System32\\notepad.exe", "process": "Notepad.exe" },
-      { "name": "Calculator", "path": "calculator:", "icon": "builtin:calculator", "process": "CalculatorApp.exe" },
-      { "name": "Settings", "path": "ms-settings:", "icon": "builtin:settings", "process": "SystemSettings.exe" },
+      { "name": "Terminal", "path": "shell:AppsFolder\\Microsoft.WindowsTerminal_8wekyb3d8bbwe!App", "process": "WindowsTerminal.exe" },
+      { "name": "Notepad", "path": "shell:AppsFolder\\Microsoft.WindowsNotepad_8wekyb3d8bbwe!App", "process": "Notepad.exe" },
+      { "name": "Calculator", "path": "shell:AppsFolder\\Microsoft.WindowsCalculator_8wekyb3d8bbwe!App", "process": "CalculatorApp.exe" },
+      { "name": "Settings", "path": "ms-settings:", "process": "SystemSettings.exe" },
       { "type": "separator" },
-      { "name": "Recycle Bin", "path": "explorer.exe", "args": ["shell:RecycleBinFolder"], "icon": "builtin:trash", "process": false }
-    ]
+      { "name": "Recycle Bin", "path": "shell:RecycleBinFolder", "process": false }
+    ],
+    "iconStyle": "square"
   },
   "island": {
     "enabled": true,
@@ -34,10 +35,30 @@
     "expandOnHover": true,
     "activityDuration": 3500,
     "quickActions": [
-      { "label": "Snip", "icon": "scissors", "uri": "ms-screenclip:" },
-      { "label": "Timer 5m", "icon": "timer", "action": "timer", "minutes": 5 },
-      { "label": "Lock", "icon": "lock", "path": "rundll32.exe", "args": ["user32.dll,LockWorkStation"] },
-      { "label": "Settings", "icon": "gear", "uri": "ms-settings:" }
+      {
+        "label": "Snip",
+        "icon": "scissors",
+        "uri": "ms-screenclip:"
+      },
+      {
+        "label": "Timer 5m",
+        "icon": "timer",
+        "action": "timer",
+        "minutes": 5
+      },
+      {
+        "label": "Lock",
+        "icon": "lock",
+        "path": "rundll32.exe",
+        "args": [
+          "user32.dll,LockWorkStation"
+        ]
+      },
+      {
+        "label": "Settings",
+        "icon": "gear",
+        "uri": "ms-settings:"
+      }
     ]
   }
 }

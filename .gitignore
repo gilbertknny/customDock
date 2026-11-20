@@ -7,3 +7,6 @@ Thumbs.db
 
 # Salesforce CLI local config
 .sf/
+
+# files delivered by Claude desktop
+Claude outputs/

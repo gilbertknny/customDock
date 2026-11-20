@@ -1,6 +1,5 @@
 // FrostShell — glassmorphism dock + Dynamic Island for Windows 11.
 const path = require('path');
-const fs = require('fs');
 const { spawn } = require('child_process');
 const {
   app,
@@ -21,6 +20,7 @@ const media = require('./system/media');
 const processes = require('./system/processes');
 const stats = require('./system/stats');
 const wallpaper = require('./system/wallpaper');
+const icons = require('./system/icons');
 
 const DEMO = process.argv.includes('--demo');
 const ASSETS = path.join(__dirname, '..', 'assets');
@@ -81,6 +81,8 @@ function runDetached(file, args = [], cwd) {
 function launch(item) {
   if (!item || !item.path) return;
   const target = expandPath(item.path);
+  // shell:RecycleBinFolder, shell:AppsFolder\<AUMID> (Store apps), …
+  if (/^shell:/i.test(target)) return runDetached('explorer.exe', [target]);
   if (isUri(target)) return shell.openExternal(target);
   if (item.args && item.args.length) {
     const cwd = path.isAbsolute(target) ? path.dirname(target) : undefined;
@@ -209,39 +211,6 @@ async function addAppDialog() {
   if (!res.canceled) addPaths(res.filePaths);
 }
 
-// ---------- icons ----------
-
-const iconCache = new Map();
-
-async function iconFor(item) {
-  const key = `${item.icon || ''}|${item.path || ''}`;
-  if (iconCache.has(key)) return iconCache.get(key);
-  let result = null;
-  try {
-    if (item.icon && !item.icon.startsWith('builtin:')) {
-      const img = nativeImage.createFromPath(expandPath(item.icon));
-      if (!img.isEmpty()) result = img.toDataURL();
-    }
-    let target = expandPath(item.path || '');
-    if (!result && target && !isUri(target) && path.isAbsolute(target)) {
-      if (/\.lnk$/i.test(target)) {
-        try {
-          const link = shell.readShortcutLink(target);
-          target = link.icon || link.target || target;
-        } catch {}
-      }
-      if (fs.existsSync(target)) {
-        const img = await app.getFileIcon(target, { size: 'large' });
-        if (!img.isEmpty()) result = img.toDataURL();
-      }
-    }
-  } catch (err) {
-    console.error('[icon]', err.message);
-  }
-  iconCache.set(key, result);
-  return result;
-}
-
 // ---------- IPC ----------
 
 ipcMain.handle('init', (e) => {
@@ -266,7 +235,7 @@ ipcMain.on('ignore', (e, ignore) => {
 });
 
 ipcMain.on('launch', (_e, index) => launch(config.get().dock.items[index]));
-ipcMain.handle('icon', (_e, item) => iconFor(item || {}));
+ipcMain.handle('icon', (_e, item) => icons.iconFor(item || {}));
 ipcMain.on('media', (_e, cmd) => media.command(cmd));
 ipcMain.on('dock-add', (_e, paths) => addPaths(Array.isArray(paths) ? paths : []));
 
@@ -280,7 +249,8 @@ ipcMain.on('dock-reorder', (_e, from, to) => {
 
 ipcMain.on('action', (_e, a) => {
   if (!a) return;
-  if (a.uri) shell.openExternal(a.uri);
+  if (a.uri && /^shell:/i.test(a.uri)) runDetached('explorer.exe', [a.uri]);
+  else if (a.uri) shell.openExternal(a.uri);
   else if (a.path) runDetached(expandPath(a.path), (a.args || []).map(expandPath));
 });
 
@@ -401,7 +371,7 @@ app.whenReady().then(() => {
   wallpaper.on('update', (url) => broadcast('wallpaper', url));
   nativeTheme.on('updated', () => broadcast('config', payloadConfig(config.get())));
   config.watch((next) => {
-    iconCache.clear();
+    icons.clear();
     applyConfig(next);
   });
 

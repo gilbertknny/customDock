@@ -33,7 +33,8 @@ macOS-style magnifying dock and an iPhone-style Dynamic Island with media contro
 
 ### 🚀 Dock
 - **macOS-style magnification** with smooth cosine falloff
-- Real app icons pulled from `.exe` / `.lnk`; built-in icons for Settings, Calculator, Terminal, Recycle Bin
+- **Native Windows icons** for everything (Win32 `.exe`/`.lnk`, Microsoft Store apps, Settings, Recycle Bin…), extracted at up to 256 px so they stay sharp when magnified
+- **Uniform square plates**: every icon sits on the same rounded-square glass tile, so mixed icon shapes line up neatly (`"iconStyle": "plain"` turns it off)
 - **Running indicators** (dot under apps that are open)
 - **Launch bounce** animation
 - **Drag to reorder**, right-click → *Add app…*, *Remove*, *Show file location*, *Add separator*
@@ -104,11 +105,13 @@ Everything lives in `%APPDATA%\FrostShell\config.json` (tray → *Edit config…
     "autoHide": false,
     "aboveTaskbar": true,
     "margin": 10,
+    "iconStyle": "square",         // square (uniform plate) | plain
     "items": [
       { "name": "Edge", "path": "%ProgramFiles(x86)%\\Microsoft\\Edge\\Application\\msedge.exe" },
-      { "name": "Spotify", "path": "spotify:", "icon": "C:\\icons\\spotify.png", "process": "Spotify.exe" },
+      { "name": "Terminal", "path": "shell:AppsFolder\\Microsoft.WindowsTerminal_8wekyb3d8bbwe!App", "process": "WindowsTerminal.exe" },
+      { "name": "Settings", "path": "ms-settings:", "process": "SystemSettings.exe" },
       { "type": "separator" },
-      { "name": "Recycle Bin", "path": "explorer.exe", "args": ["shell:RecycleBinFolder"], "icon": "builtin:trash", "process": false }
+      { "name": "Recycle Bin", "path": "shell:RecycleBinFolder", "process": false }
     ]
   },
   "island": {
@@ -132,14 +135,14 @@ Everything lives in `%APPDATA%\FrostShell\config.json` (tray → *Edit config…
 | Field | Description |
 |---|---|
 | `name` | Tooltip label |
-| `path` | `.exe`, `.lnk`, folder, or URI (`ms-settings:`, `steam://…`). `%ENV%` vars are expanded |
+| `path` | `.exe`, `.lnk`, folder, URI (`ms-settings:`, `steam://…`), `shell:RecycleBinFolder`, or a Store app as `shell:AppsFolder\\<AUMID>`. `%ENV%` vars are expanded |
 | `args` | Optional argument array |
-| `icon` | Path to `.png/.ico/.jpg`, or `builtin:terminal \| calculator \| settings \| trash \| folder` |
+| `icon` | Optional override. By default the app's own Windows icon is used. Accepts `.png/.ico/.jpg`, or a resource like `%WINDIR%\\System32\\imageres.dll,-55` |
 | `process` | Process name for the running dot. Defaults to the exe name; `false` disables it |
 
 **Quick action icons:** `scissors`, `timer`, `lock`, `gear`, `music`, `bolt`, `plug`, `battery`.
 
-> 💡 System file icons max out at 48 px. For crisp icons at high magnification, point `icon` to a 256 px PNG.
+> 💡 Tip: find a Store app's AUMID with `Get-StartApps` in PowerShell.
 
 ---
 
@@ -153,6 +156,7 @@ src/
 ├── system/
 │   ├── media.ps1        # WinRT SMTC bridge (now playing + controls)
 │   ├── media.js         # long-running PowerShell watcher, art cache
+│   ├── icons.ps1/.js    # native Windows icon extraction (exe/dll + Store apps)
 │   ├── wallpaper.js     # finds & watches the current wallpaper
 │   ├── processes.js     # running-app detection (tasklist)
 │   └── stats.js         # CPU / RAM
@@ -187,7 +191,7 @@ PRs are very welcome!
 **FrostShell** itu dock ala macOS + Dynamic Island ala iPhone buat Windows 11, dengan gaya glassmorphism.
 
 - **Island**: jam, kontrol musik (Spotify/YouTube/dll.), notifikasi charging, timer, CPU/RAM/baterai. Hover buat expand.
-- **Dock**: efek magnify, ikon app asli, indikator app yang lagi jalan, drag buat ngatur urutan, auto-hide.
+- **Dock**: efek magnify, ikon asli bawaan Windows (diseragamkan di atas alas kotak), indikator app yang lagi jalan, drag buat ngatur urutan, auto-hide.
 - **Glass beneran**: wallpaper kamu di-blur di belakang tiap panel, jadi efek kacanya kelihatan nyata, bukan cuma kotak transparan.
 
 Cara pakai: `npm install` lalu `npm start`. Pengaturan ada di `%APPDATA%\FrostShell\config.json` (klik kanan ikon tray → *Edit config…*). Saran: nyalakan *auto-hide taskbar* Windows biar dock-nya bisa nempel di bawah.

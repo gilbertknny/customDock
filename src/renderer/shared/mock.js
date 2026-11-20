@@ -24,16 +24,18 @@
       autoHide: false,
       aboveTaskbar: true,
       margin: 10,
+      iconStyle: q.get('icons') || 'square',
       items: [
-        { name: 'File Explorer', icon: 'builtin:folder' },
-        { name: 'Edge', path: 'msedge.exe' },
-        { name: 'Terminal', icon: 'builtin:terminal', process: 'WindowsTerminal.exe' },
-        { name: 'Spotify', path: 'Spotify.exe' },
-        { name: 'VS Code', path: 'Code.exe' },
-        { name: 'Calculator', icon: 'builtin:calculator' },
-        { name: 'Settings', icon: 'builtin:settings' },
+        { name: 'File Explorer', path: 'folder', process: false },
+        { name: 'Browser', path: 'globe' },
+        { name: 'Terminal', path: 'terminal', process: 'terminal' },
+        { name: 'Music', path: 'music', process: 'music' },
+        { name: 'Code', path: 'code' },
+        { name: 'Notepad', path: 'note' },
+        { name: 'Calculator', path: 'calc' },
+        { name: 'Settings', path: 'gear' },
         { type: 'separator' },
-        { name: 'Recycle Bin', icon: 'builtin:trash', process: false },
+        { name: 'Recycle Bin', path: 'bin', process: false },
       ],
     },
     island: {
@@ -59,6 +61,21 @@
     );
   let media = { active: true, key: 'a', title: 'Glass Horizons', artist: 'Aurora Lane', app: 'Spotify', playing: true, position: 74, duration: 214, art };
 
+  // Stand-ins for real Windows icons (mixed shapes on purpose, to show the uniform plate).
+  const SAMPLE = {
+    folder: '<path d="M8 22a5 5 0 0 1 5-5h20l6 6h28a5 5 0 0 1 5 5v36a5 5 0 0 1-5 5H13a5 5 0 0 1-5-5z" fill="#f4b73f"/><path d="M8 32h64v32a5 5 0 0 1-5 5H13a5 5 0 0 1-5-5z" fill="#ffd25c"/>',
+    globe: '<circle cx="40" cy="40" r="30" fill="#2f8cf0"/><path d="M10 40h60M40 10c-12 14-12 46 0 60M40 10c12 14 12 46 0 60" stroke="#bfe0ff" stroke-width="3" fill="none"/>',
+    terminal: '<rect x="8" y="14" width="64" height="52" rx="7" fill="#1e2129"/><rect x="8" y="14" width="64" height="10" rx="5" fill="#3a3f4b"/><path d="M20 36l9 7-9 7" stroke="#fff" stroke-width="4" fill="none" stroke-linecap="round"/><path d="M34 52h14" stroke="#5ce39c" stroke-width="4" stroke-linecap="round"/>',
+    music: '<circle cx="40" cy="40" r="30" fill="#e8436b"/><path d="M33 52V27l20-5v25" stroke="#fff" stroke-width="4" fill="none"/><circle cx="29" cy="52" r="5" fill="#fff"/><circle cx="49" cy="47" r="5" fill="#fff"/>',
+    code: '<path d="M14 18l40-8 14 10v40l-14 10-40-8z" fill="#2c7be5"/><path d="M34 30l-8 10 8 10M46 30l8 10-8 10" stroke="#fff" stroke-width="4" fill="none" stroke-linecap="round"/>',
+    note: '<path d="M18 8h32l14 14v50H18z" fill="#fff" stroke="#9aa3b2" stroke-width="2"/><path d="M50 8v14h14" fill="#dfe4ec"/><path d="M26 36h30M26 46h30M26 56h20" stroke="#5a8dee" stroke-width="3"/>',
+    calc: '<rect x="18" y="8" width="44" height="64" rx="7" fill="#3b3f4a"/><rect x="24" y="14" width="32" height="12" rx="3" fill="#a8e6cf"/><g fill="#d9dce3"><rect x="24" y="32" width="8" height="8" rx="2"/><rect x="36" y="32" width="8" height="8" rx="2"/><rect x="24" y="44" width="8" height="8" rx="2"/><rect x="36" y="44" width="8" height="8" rx="2"/><rect x="24" y="56" width="8" height="8" rx="2"/><rect x="36" y="56" width="8" height="8" rx="2"/></g><rect x="48" y="32" width="8" height="32" rx="2" fill="#ff8c42"/>',
+    gear: '<g transform="translate(40 40)" fill="#7b8494">' + Array.from({ length: 8 }, (_, i) => `<rect x="-5" y="-31" width="10" height="14" rx="3" transform="rotate(${i * 45})"/>`).join('') + '<circle r="21"/></g><circle cx="40" cy="40" r="9" fill="#e9ecf2"/>',
+    bin: '<path d="M22 24h36l-3 44a5 5 0 0 1-5 4H30a5 5 0 0 1-5-4z" fill="#dfe8f5" stroke="#8fa3c0" stroke-width="2"/><rect x="17" y="16" width="46" height="8" rx="3" fill="#8fa3c0"/>',
+  };
+  const sampleIcon = (k) =>
+    SAMPLE[k] ? 'data:image/svg+xml;utf8,' + encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 80">${SAMPLE[k]}</svg>`) : null;
+
   window.frost = {
     init: async () => ({
       kind,
@@ -70,7 +87,7 @@
       wallpaper: q.get('wallpaper') || '../../../assets/demo-wallpaper.jpg',
       media,
       stats: { cpu: 0.23, mem: 0.58 },
-      running: ['msedge.exe', 'windowsterminal.exe', 'spotify.exe'],
+      running: ['globe', 'terminal', 'music'],
     }),
     setIgnore: () => {},
     launch: (i) => console.log('[mock] launch', i),
@@ -82,7 +99,7 @@
       config.dock.items.splice(b, 0, it);
       emit('config', { config, theme: config.theme });
     },
-    icon: async () => null,
+    icon: async (item) => sampleIcon(item.path),
     media: (cmd) => {
       if (cmd === 'toggle') media = { ...media, playing: !media.playing };
       else media = { ...media, key: String(Math.random()), title: cmd === 'next' ? 'Midnight Frost' : 'Soft Focus', artist: 'Neon Drift', position: 0 };

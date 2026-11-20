@@ -28,23 +28,20 @@
     return m ? m[1].toLowerCase() : null;
   }
 
+  // Always the real Windows icon (resolved by the main process); the square plate
+  // behind it is what makes every icon look uniform.
   async function setIcon(tile, item) {
-    if (item.icon && item.icon.startsWith('builtin:')) {
-      tile.innerHTML = Icons.tile(item.icon.slice(8), item.name);
-      return;
-    }
     let url = null;
     try {
       url = await frost.icon(item);
     } catch {}
-    if (url) {
-      const img = new Image();
-      img.draggable = false;
-      img.src = url;
-      tile.replaceChildren(img);
-    } else {
-      tile.innerHTML = Icons.tile('app', item.name);
-    }
+    if (!url) return; // keep the neutral placeholder
+    const img = new Image();
+    img.draggable = false;
+    img.alt = '';
+    img.onload = () => tile.classList.remove('loading');
+    img.src = url;
+    tile.replaceChildren(img);
   }
 
   function render() {
@@ -52,6 +49,7 @@
     document.documentElement.style.setProperty('--icon', `${d.iconSize}px`);
     document.documentElement.style.setProperty('--margin', `${d.margin}px`);
     document.body.classList.toggle('autohide', !!d.autoHide);
+    document.body.classList.toggle('icons-plain', d.iconStyle === 'plain');
     hot.toggleAttribute('data-hit', !!d.autoHide);
     if (d.autoHide) document.body.classList.add('hidden');
     else document.body.classList.remove('hidden');
@@ -71,8 +69,8 @@
       el.dataset.index = i;
       el.draggable = true;
       const tile = document.createElement('div');
-      tile.className = 'tile';
-      tile.innerHTML = Icons.tile('app', item.name);
+      tile.className = 'tile loading';
+      tile.innerHTML = Icons.placeholder;
       el.append(tile);
       setIcon(tile, item);
       el._item = item;

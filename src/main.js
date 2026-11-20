@@ -327,6 +327,15 @@ function groupWindows(list) {
     g.hwnds.push(w.hwnd);
     g.titles[w.hwnd] = w.title || '';
   }
+  // windows of the same exe without an AUMID belong to that app's AUMID group
+  const all = [...groups.values()];
+  for (const g of all.filter((x) => !x.aumid && x.path)) {
+    const owner = all.find((x) => x.aumid && x.path && x.path.toLowerCase() === g.path.toLowerCase());
+    if (!owner) continue;
+    owner.hwnds.push(...g.hwnds);
+    Object.assign(owner.titles, g.titles);
+    groups.delete(g.key);
+  }
   return [...groups.values()];
 }
 
@@ -522,9 +531,11 @@ on('action', (_e, index) => {
   else if (a.path) runDetached(expandPath(a.path), (a.args || []).map(expandPath));
 });
 
-on('dock-menu', (e, index, groupKey) => {
+on('dock-menu', (e, index, groupKeys) => {
   const win = BrowserWindow.fromWebContents(e.sender);
-  const running = groupKey ? runningGroups.find((x) => x.key === groupKey) : null;
+  const keys = [].concat(groupKeys || []);
+  const matched = runningGroups.filter((x) => keys.includes(x.key));
+  const running = matched.length ? { hwnds: matched.flatMap((g) => g.hwnds) } : null;
   const cfg = config.get();
   const item = index >= 0 ? cfg.dock.items[index] : null;
   const tpl = [];

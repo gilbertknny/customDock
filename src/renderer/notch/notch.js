@@ -78,7 +78,7 @@
     const s = notif.current ? 'toast' : expand ? 'expanded' : osd ? 'osd' : activity ? 'activity' : 'compact';
     const entering = s !== state;
     state = s;
-    island.classList.remove('s-compact', 's-activity', 's-toast', 's-expanded');
+    island.classList.remove('s-compact', 's-activity', 's-osd', 's-toast', 's-expanded');
     island.classList.add(`s-${s}`);
     if (s !== 'compact') setK(1, false);
     else setK(restK(), false);

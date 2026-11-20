@@ -37,19 +37,26 @@
   const exeOf = (p) => ((p || '').match(/([^\\/]+\.exe)$/i) || [])[1];
 
   // which open-window group belongs to a pinned dock item?
-  function groupFor(item) {
-    if (!item || item.type === 'separator') return null;
+  // All open-window groups that belong to a pinned dock item. One app can show up as
+  // several groups (e.g. some windows carry an AUMID and others don't), so we gather
+  // them all into one virtual group: one icon, all windows.
+  function groupsFor(item) {
+    if (!item || item.type === 'separator') return [];
     const aumid = ((item.path || '').match(/^shell:AppsFolder\\(.+)$/i) || [])[1];
     const exes = [typeof item.process === 'string' ? item.process : null, exeOf(item.path)].filter(Boolean).map(lc);
-    return (
-      groups.find((g) => (aumid && lc(g.aumid) === lc(aumid)) || (g.exe && exes.includes(lc(g.exe)))) || null
-    );
+    return groups.filter((g) => (aumid && lc(g.aumid) === lc(aumid)) || (g.exe && exes.includes(lc(g.exe))));
+  }
+  function groupFor(item) {
+    const list = groupsFor(item);
+    if (!list.length) return null;
+    if (list.length === 1) return list[0];
+    return { key: list[0].key, keys: list.map((g) => g.key), hwnds: list.flatMap((g) => g.hwnds), name: list[0].name };
   }
 
   // running apps that aren't pinned: shown before the first separator, like macOS
   function extraGroups() {
     if (cfg.dock.showRunning === false) return [];
-    const taken = new Set(cfg.dock.items.map(groupFor).filter(Boolean).map((g) => g.key));
+    const taken = new Set(cfg.dock.items.flatMap((i) => groupsFor(i).map((g) => g.key)));
     return groups.filter((g) => !taken.has(g.key));
   }
 
@@ -346,7 +353,8 @@
     if (extra) return frost.runningMenu(extra.dataset.extra);
     const el = e.target.closest('[data-index]');
     const item = el && el.classList.contains('item') ? itemEls.find((x) => x === el) : null;
-    frost.dockMenu(el ? Number(el.dataset.index) : -1, item && item._running ? item._running.key : undefined);
+    const run = item && item._running;
+    frost.dockMenu(el ? Number(el.dataset.index) : -1, run ? run.keys || [run.key] : undefined);
   });
 
   // ----- drag to reorder / drop files to pin -----

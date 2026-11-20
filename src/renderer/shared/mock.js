@@ -91,6 +91,12 @@
   const sampleIcon = (k) =>
     SAMPLE[k] ? 'data:image/svg+xml;utf8,' + encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 80">${SAMPLE[k]}</svg>`) : null;
 
+  const mockBt = [
+    { id: 'bt1', name: 'Sony WH-1000XM5', connected: true, kind: 'audio', container: 'c1', canConnect: true },
+    { id: 'bt2', name: 'Galaxy Buds2 Pro', connected: false, kind: 'audio', container: 'c2', canConnect: true },
+    { id: 'bt3', name: 'MX Master 3S', connected: true, kind: 'input', container: 'c3', canConnect: false },
+    { id: 'bt4', name: 'Pixel 8', connected: false, kind: 'phone', container: 'c4', canConnect: false },
+  ];
   const mockNets = [
     { ssid: 'Rumah_5G', signal: 92, secure: true, auth: 'personal', connected: true, saved: true, profile: 'Rumah_5G' },
     { ssid: 'Rumah_2.4G', signal: 78, secure: true, auth: 'personal', connected: false, saved: true, profile: 'Rumah_2.4G' },
@@ -98,7 +104,7 @@
     { ssid: 'IndiHome-7F2A', signal: 48, secure: true, auth: 'personal', connected: false, saved: false },
     { ssid: 'KANTOR-CORP', signal: 30, secure: true, auth: 'enterprise', connected: false, saved: false },
   ];
-  const ccState = { volume: 0.62, muted: false, brightness: 70, wifi: true, bluetooth: true, airplane: false, ssid: 'Rumah_5G', signal: 82, ethernet: false, lowPower: false, dnd: true };
+  const ccState = { volume: 0.62, muted: false, brightness: 70, wifi: true, bluetooth: true, airplane: false, ssid: 'Rumah_5G', signal: 82, ethernet: false, lowPower: false, dnd: true, darkMode: true };
 
   window.frost = {
     init: async () => ({
@@ -166,6 +172,12 @@
     notifDismiss: (ids) => console.log('[mock] dismiss', ids),
     controls: async (req) => {
       const c = ccState;
+      if (req.cmd === 'btList' || req.cmd === 'btConnect') {
+        await new Promise((r) => setTimeout(r, req.cmd === 'btConnect' ? 1200 : 300));
+        if (req.cmd === 'btConnect') { const d = mockBt.find((x) => x.container === req.container); if (d) d.connected = !!req.on; }
+        return { ok: true, bt: { devices: mockBt.map((d) => ({ ...d })), ...(req.cmd === 'btConnect' ? { result: 'ok' } : {}) }, state: { ...c } };
+      }
+      if (req.cmd === 'setDarkMode') { c.darkMode = !!req.on; return { ok: true, state: { ...c } }; }
       if (req.cmd.startsWith('wifi')) {
         const nets = mockNets;
         const out = (extra = {}) => ({ ok: true, wifi: { networks: c.wifi ? nets.map((n) => ({ ...n })) : [], ...(c.wifi ? {} : { error: 'off' }), ...extra }, state: { ...c } });

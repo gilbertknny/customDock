@@ -1,6 +1,7 @@
 # FrostShell system controls — persistent line-based JSON RPC over stdin/stdout.
 # in : {"id":1,"cmd":"state"} | setVolume{value 0-1} | setMute{value} | setBrightness{value 0-100}
 #      wifiList{scan} | wifiConnect{ssid,password?} | wifiDisconnect | wifiForget{profile}
+#      btList | btConnect{container,on} | setDarkMode{on}
 #      setRadio{kind:"WiFi"|"Bluetooth", on} | setAirplane{on} | setLowPower{on} | setDnd{on}
 # out: {"id":1,"ok":true,"state":{...}}   (the full state after every command)
 # The loop ends when stdin closes, so it never outlives FrostShell.
@@ -203,6 +204,130 @@ public static class FrostWifi {
   }
 }
 
+// ---- Bluetooth audio connect/disconnect (the ToothTray technique) ----
+// Each Bluetooth audio device has KS filter(s) behind its audio endpoints; asking the
+// filter for KSPROPERTY_ONESHOT_RECONNECT / _DISCONNECT makes Windows (dis)connect it.
+[StructLayout(LayoutKind.Sequential, Pack = 4)] public struct FrostBtKey { public Guid fmtid; public uint pid; }
+[StructLayout(LayoutKind.Sequential)] public struct FrostBtVariant { public ushort vt; public ushort r1, r2, r3; public IntPtr p; public IntPtr p2; }
+[StructLayout(LayoutKind.Sequential)] public struct FrostKsProp { public Guid Set; public int Id; public int Flags; }
+
+[ComImport, Guid("A95664D2-9614-4F35-A746-DE8DB63617E6"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+interface IBtEnumerator {
+  [PreserveSig] int EnumAudioEndpoints(int dataFlow, int stateMask, out IBtCollection devices);
+  [PreserveSig] int GetDefaultAudioEndpoint(int dataFlow, int role, out IBtDevice endpoint);
+  [PreserveSig] int GetDevice([MarshalAs(UnmanagedType.LPWStr)] string id, out IBtDevice device);
+}
+[ComImport, Guid("0BD7A1BE-7A1A-44DB-8397-CC5392387B5E"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+interface IBtCollection {
+  [PreserveSig] int GetCount(out uint n);
+  [PreserveSig] int Item(uint i, out IBtDevice d);
+}
+[ComImport, Guid("D666063F-1587-4E43-81F1-B948E807363F"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+interface IBtDevice {
+  [PreserveSig] int Activate(ref Guid iid, int ctx, IntPtr p, [MarshalAs(UnmanagedType.IUnknown)] out object o);
+  [PreserveSig] int OpenPropertyStore(int access, out IBtPropertyStore store);
+  [PreserveSig] int GetId([MarshalAs(UnmanagedType.LPWStr)] out string id);
+  [PreserveSig] int GetState(out int state);
+}
+[ComImport, Guid("886D8EEB-8CF2-4446-8D02-CDBA1DBDCF99"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+interface IBtPropertyStore {
+  [PreserveSig] int GetCount(out uint c);
+  [PreserveSig] int GetAt(uint i, out FrostBtKey k);
+  [PreserveSig] int GetValue(ref FrostBtKey k, out FrostBtVariant v);
+}
+[ComImport, Guid("2A07407E-6497-4A18-9787-32F79BD0D98F"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+interface IBtTopology {
+  [PreserveSig] int GetConnectorCount(out uint n);
+  [PreserveSig] int GetConnector(uint i, out IBtConnector c);
+}
+[ComImport, Guid("9c2c4058-23f5-41de-877a-df3af236a09e"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+interface IBtConnector {
+  [PreserveSig] int GetConnectorType(out int t);
+  [PreserveSig] int GetDataFlow(out int f);
+  [PreserveSig] int ConnectTo(IntPtr other);
+  [PreserveSig] int Disconnect();
+  [PreserveSig] int IsConnected(out bool b);
+  [PreserveSig] int GetConnectedTo(out IntPtr c);
+  [PreserveSig] int GetConnectorIdConnectedTo([MarshalAs(UnmanagedType.LPWStr)] out string id);
+  [PreserveSig] int GetDeviceIdConnectedTo([MarshalAs(UnmanagedType.LPWStr)] out string id);
+}
+[ComImport, Guid("28F54685-06FD-11D2-B27A-00A0C9223196"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+interface IBtKsControl {
+  [PreserveSig] int KsProperty(ref FrostKsProp prop, int propLen, IntPtr data, int dataLen, out int returned);
+}
+[ComImport, Guid("BCDE0395-E52F-467C-8E3D-C4579291692E")] class BtEnumeratorCom { }
+
+public static class FrostBtAudio {
+  [DllImport("ole32.dll")] static extern int PropVariantClear(ref FrostBtVariant v);
+  static readonly Guid PKEY_ContainerId = new Guid("8c7ed206-3f8a-4827-b3ab-ae9e1faefc6c");
+  static readonly Guid KSPROPSETID_BtAudio = new Guid("7FA06C40-B8F6-4C7E-8556-E8C33A12E54D");
+
+  static bool ContainerOf(IBtDevice d, out Guid c) {
+    c = Guid.Empty;
+    IBtPropertyStore s; if (d.OpenPropertyStore(0, out s) != 0 || s == null) return false;
+    var k = new FrostBtKey { fmtid = PKEY_ContainerId, pid = 2 };
+    FrostBtVariant v; if (s.GetValue(ref k, out v) != 0) return false;
+    try {
+      if (v.vt == 72 /*VT_CLSID*/ && v.p != IntPtr.Zero) { c = (Guid)Marshal.PtrToStructure(v.p, typeof(Guid)); return true; }
+      return false;
+    } finally { PropVariantClear(ref v); }
+  }
+
+  // container id -> KS filter ids of its audio endpoints (all states, incl. disconnected)
+  static Dictionary<Guid, List<string>> Map() {
+    var map = new Dictionary<Guid, List<string>>();
+    var en = (IBtEnumerator)new BtEnumeratorCom();
+    IBtCollection col; if (en.EnumAudioEndpoints(2 /*eAll*/, 0xF, out col) != 0) return map;
+    uint n; col.GetCount(out n);
+    for (uint i = 0; i < n; i++) {
+      try {
+        IBtDevice d; if (col.Item(i, out d) != 0) continue;
+        Guid c; if (!ContainerOf(d, out c)) continue;
+        object o; Guid iid = typeof(IBtTopology).GUID;
+        if (d.Activate(ref iid, 23, IntPtr.Zero, out o) != 0) continue;
+        IBtConnector con; if (((IBtTopology)o).GetConnector(0, out con) != 0 || con == null) continue;
+        string fid; if (con.GetDeviceIdConnectedTo(out fid) != 0 || string.IsNullOrEmpty(fid)) continue;
+        if (fid.IndexOf("BTHENUM", StringComparison.OrdinalIgnoreCase) < 0 && fid.IndexOf("BTHHFENUM", StringComparison.OrdinalIgnoreCase) < 0 && fid.IndexOf("BTHLEDEVICE", StringComparison.OrdinalIgnoreCase) < 0) continue;
+        List<string> l; if (!map.TryGetValue(c, out l)) { l = new List<string>(); map[c] = l; }
+        if (!l.Contains(fid)) l.Add(fid);
+      } catch { }
+    }
+    return map;
+  }
+
+  public static string[] AudioContainers() {
+    var list = new List<string>();
+    foreach (var c in Map().Keys) list.Add(c.ToString().ToLowerInvariant());
+    return list.ToArray();
+  }
+
+  // returns how many filters accepted the request (0 = not a BT audio device / failed)
+  public static int Send(Guid container, bool connect) {
+    List<string> filters; if (!Map().TryGetValue(container, out filters)) return 0;
+    var en = (IBtEnumerator)new BtEnumeratorCom();
+    int ok = 0;
+    foreach (var fid in filters) {
+      try {
+        IBtDevice f; if (en.GetDevice(fid, out f) != 0) continue;
+        object o; Guid iid = typeof(IBtKsControl).GUID;
+        if (f.Activate(ref iid, 23, IntPtr.Zero, out o) != 0) continue;
+        var prop = new FrostKsProp { Set = KSPROPSETID_BtAudio, Id = connect ? 0 : 1, Flags = 1 /*GET*/ };
+        int ret; if (((IBtKsControl)o).KsProperty(ref prop, Marshal.SizeOf(typeof(FrostKsProp)), IntPtr.Zero, 0, out ret) == 0) ok++;
+      } catch { }
+    }
+    return ok;
+  }
+}
+
+public static class FrostTheme {
+  [DllImport("user32.dll", CharSet = CharSet.Unicode)]
+  static extern IntPtr SendMessageTimeout(IntPtr h, uint msg, IntPtr w, string l, uint flags, uint timeout, out IntPtr result);
+  // tell Explorer + apps the light/dark setting changed (same message Settings sends)
+  public static void Broadcast() {
+    IntPtr r; SendMessageTimeout((IntPtr)0xffff, 0x001A /*WM_SETTINGCHANGE*/, IntPtr.Zero, "ImmersiveColorSet", 2 /*ABORTIFHUNG*/, 3000, out r);
+  }
+}
+
 public static class FrostPower {
   [DllImport("powrprof.dll")] public static extern uint PowerSetActiveOverlayScheme(Guid scheme);
   [DllImport("powrprof.dll")] public static extern uint PowerGetEffectiveOverlayScheme(out Guid scheme);
@@ -221,6 +346,38 @@ function Await($op, [Type]$type) {
 }
 $null = [Windows.Devices.Radios.Radio, Windows.System.Devices, ContentType = WindowsRuntime]
 $null = Await ([Windows.Devices.Radios.Radio]::RequestAccessAsync()) ([Windows.Devices.Radios.RadioAccessStatus])
+
+$null = [Windows.Devices.Enumeration.DeviceInformation, Windows.Devices.Enumeration, ContentType = WindowsRuntime]
+$PERSONALIZE = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Themes\Personalize'
+
+function Get-BtDevices {
+  $props = New-Object 'System.Collections.Generic.List[string]'
+  'System.Devices.Aep.IsConnected', 'System.Devices.Aep.ContainerId', 'System.Devices.Aep.Bluetooth.Cod.Major' | ForEach-Object { $props.Add($_) }
+  $audio = @{}
+  try { foreach ($c in [FrostBtAudio]::AudioContainers()) { $audio[$c] = $true } } catch {}
+  $seen = @{}
+  $out = New-Object System.Collections.ArrayList
+  # classic Bluetooth + Bluetooth LE, paired only
+  foreach ($proto in '{e0cbf06c-cd8b-4647-bb8a-263b43f0f974}', '{bb7bb05e-5972-42b5-94fc-76eaa7084d49}') {
+    $sel = "System.Devices.Aep.ProtocolId:=`"$proto`" AND System.Devices.Aep.IsPaired:=System.StructuredQueryType.Boolean#True"
+    $coll = Await ([Windows.Devices.Enumeration.DeviceInformation]::FindAllAsync($sel, $props, [Windows.Devices.Enumeration.DeviceInformationKind]::AssociationEndpoint)) `
+      ([Windows.Devices.Enumeration.DeviceInformationCollection])
+    foreach ($d in $coll) {
+      if (-not $d.Name) { continue }
+      $cid = "$($d.Properties['System.Devices.Aep.ContainerId'])".ToLowerInvariant()
+      $connected = [bool]$d.Properties['System.Devices.Aep.IsConnected']
+      $key = if ($cid) { $cid } else { $d.Id }
+      if ($seen.ContainsKey($key)) { if ($connected) { $seen[$key].connected = $true }; continue }
+      $kind = switch ([int]$d.Properties['System.Devices.Aep.Bluetooth.Cod.Major']) { 4 { 'audio' } 5 { 'input' } 2 { 'phone' } 1 { 'computer' } default { 'other' } }
+      $canConnect = [bool]($cid -and $audio.ContainsKey($cid))
+      if ($canConnect) { $kind = 'audio' }
+      $o = [pscustomobject]@{ id = $d.Id; name = $d.Name; connected = $connected; kind = $kind; container = $cid; canConnect = $canConnect }
+      $seen[$key] = $o
+      [void]$out.Add($o)
+    }
+  }
+  @($out | Sort-Object @{ e = { -not $_.connected } }, @{ e = { $_.name } })
+}
 
 $EFFICIENCY = [Guid]'961cc777-2547-4f9d-8174-7d86181b8a7a'   # Power mode: best power efficiency
 $BALANCED = [Guid]::Empty
@@ -272,6 +429,9 @@ function Get-State {
 
   $t = (Get-ItemProperty -Path $TOASTS -Name NOC_GLOBAL_SETTING_TOASTS_ENABLED).NOC_GLOBAL_SETTING_TOASTS_ENABLED
   $s.dnd = ($t -eq 0)
+
+  $light = (Get-ItemProperty -Path $PERSONALIZE -Name AppsUseLightTheme).AppsUseLightTheme
+  $s.darkMode = ($light -eq 0)
   $s
 }
 
@@ -292,6 +452,20 @@ function Get-WifiList([bool]$scan) {
 
 function Invoke-Cmd($req) {
   switch ($req.cmd) {
+    'btList' { try { $script:bt = @{ devices = @(Get-BtDevices) } } catch { $script:bt = @{ devices = @(); error = 'failed' } } }
+    'btConnect' {
+      $n = 0
+      try { $n = [FrostBtAudio]::Send([Guid]$req.container, [bool]$req.on) } catch {}
+      Start-Sleep -Milliseconds 2500   # give Windows a moment to (dis)connect
+      try { $script:bt = @{ devices = @(Get-BtDevices) } } catch { $script:bt = @{ devices = @() } }
+      $script:bt.result = if ($n -gt 0) { 'ok' } else { 'unsupported' }
+    }
+    'setDarkMode' {
+      $v = if ($req.on) { 0 } else { 1 }
+      Set-ItemProperty -Path $PERSONALIZE -Name AppsUseLightTheme -Value $v -Type DWord
+      Set-ItemProperty -Path $PERSONALIZE -Name SystemUsesLightTheme -Value $v -Type DWord
+      [FrostTheme]::Broadcast()
+    }
     'wifiList' { $script:wifi = Get-WifiList ([bool]$req.scan) }
     'wifiConnect' {
       try { $r = [FrostWifi]::Connect([string]$req.ssid, [string]$req.password) } catch { $r = 'failed' }
@@ -336,8 +510,10 @@ while ($null -ne ($line = [Console]::In.ReadLine())) {
   $req = $line | ConvertFrom-Json
   $res = [ordered]@{ id = $req.id; ok = $true }
   $script:wifi = $null
+  $script:bt = $null
   try { Invoke-Cmd $req } catch { $res.ok = $false; $res.error = "$_" }
   if ($script:wifi) { $res.wifi = $script:wifi }
+  if ($script:bt) { $res.bt = $script:bt }
   $res.state = Get-State
   [Console]::Out.WriteLine(($res | ConvertTo-Json -Compress -Depth 6))
   [Console]::Out.Flush()

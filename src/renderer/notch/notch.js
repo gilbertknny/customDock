@@ -88,6 +88,7 @@
     } else {
       stopCcPolling();
       if (typeof closeWifi === 'function') closeWifi();
+      if (typeof closeBt === 'function') closeBt();
     }
     ui.kick();
     drawShape();
@@ -196,6 +197,7 @@
   let currentTab = 'home';
   function selectTab(name) {
     if (name !== 'controls' && typeof closeWifi === 'function') closeWifi();
+    if (name !== 'controls' && typeof closeBt === 'function') closeBt();
     currentTab = name;
     document.querySelectorAll('.tabs button').forEach((b) => b.classList.toggle('on', b.dataset.tab === name));
     document.querySelectorAll('.page').forEach((p) => p.classList.toggle('on', p.dataset.page === name));
@@ -468,6 +470,7 @@
   function renderCc(s) {
     cc.state = s;
     if (typeof wifi !== 'undefined' && wifi.open) renderWifiHead();
+    if (typeof bt !== 'undefined' && bt.open) renderBtHead();
     // Wi-Fi
     const wifiSub = s.wifi === null ? (s.ethernet ? 'Ethernet' : 'Unavailable') : s.wifi ? s.ssid || 'Not connected' : 'Off';
     setTile('wifi', s.wifi, wifiSub, s.wifi === false ? 'wifiOff' : s.wifi === null && s.ethernet ? 'ethernet' : 'wifi', s.wifi !== null);
@@ -475,6 +478,7 @@
     setTile('bluetooth', s.bluetooth, s.bluetooth === null ? 'Unavailable' : s.bluetooth ? 'On' : 'Off', 'bluetooth', s.bluetooth !== null);
     // Sound
     setTile('mute', s.muted, s.muted ? 'Muted' : 'On', s.muted ? 'muted' : 'volume', s.volume !== null);
+    setTile('dark', s.darkMode, s.darkMode ? 'On' : 'Off', s.darkMode ? 'moon' : 'sun', s.darkMode !== null && s.darkMode !== undefined);
     // sliders
     setSlider('brightness', s.brightness ?? 0, s.brightness !== null, 'sun');
     const vol = Math.round((s.volume ?? 0) * 100);
@@ -560,6 +564,7 @@
   $('.wp-refresh').innerHTML = Icons.glyph('refresh');
 
   function openWifi() {
+    if (typeof closeBt === 'function') closeBt();
     ctrlPage.classList.add('wifi-open');
     wifi.open = true;
     wifi.errors = {};
@@ -786,11 +791,129 @@
     openWifi();
   });
 
-  document.querySelector('.cc-tile[data-cc="bluetooth"]').addEventListener('click', () => {
-    if (!cc.state) return;
-    const on = !cc.state.bluetooth;
+  // ---------- Bluetooth devices ----------
+  const btPanel = document.querySelector('.wp-bt');
+  const bq = (sel) => btPanel.querySelector(sel);
+  const bt = { open: false, devices: [], busy: null, errors: {}, loading: false, poll: null };
+  bq('.bt-back').innerHTML = Icons.glyph('back');
+  bq('.bt-refresh').innerHTML = Icons.glyph('refresh');
+  const btIcon = { audio: 'headphones', input: 'mouse', phone: 'phone', computer: 'laptop', other: 'bluetooth' };
+
+  function openBt() {
+    closeWifi();
+    ctrlPage.classList.add('bt-open');
+    bt.open = true;
+    bt.errors = {};
+    renderBt();
+    loadBt();
+    clearInterval(bt.poll);
+    bt.poll = setInterval(() => !bt.busy && loadBt(true), 5000); // headphones come and go
+  }
+  function closeBt() {
+    if (!bt.open) return;
+    ctrlPage.classList.remove('bt-open');
+    bt.open = false;
+    clearInterval(bt.poll);
+  }
+
+  async function loadBt(quiet) {
+    if (!bt.open) return;
+    if (!quiet) bt.loading = true;
+    renderBtHead();
+    const res = await ccRun({ cmd: 'btList' });
+    bt.loading = false;
+    if (res && res.bt) bt.devices = res.bt.devices || [];
+    renderBt();
+  }
+
+  function renderBtHead() {
+    const on = !!(cc.state && cc.state.bluetooth);
+    bq('.bt-toggle').checked = on;
+    bq('.bt-refresh').classList.toggle('spin', bt.loading);
+    bq('.bt-status').textContent = !on ? 'Off' : bt.loading ? 'Refreshing…' : '';
+  }
+
+  function renderBt() {
+    renderBtHead();
+    const on = !!(cc.state && cc.state.bluetooth);
+    const list = bq('.bt-list');
+    const msg = bq('.bt-msg');
+    list.replaceChildren();
+    msg.textContent = !on
+      ? 'Bluetooth is off. Turn it on to connect your devices.'
+      : !bt.devices.length
+        ? bt.loading
+          ? 'Looking for your devices…'
+          : 'No paired devices yet. Use “Add device” to pair one.'
+        : '';
+    if (!on) return;
+    for (const d of bt.devices) {
+      const el = document.createElement('div');
+      const busy = bt.busy === d.container;
+      el.className = 'wp-net' + (d.connected ? ' connected' : '') + (busy ? ' busy' : '');
+      el.innerHTML = `<div class="wp-row"><span class="wp-sig bt">${Icons.glyph(btIcon[d.kind] || 'bluetooth')}</span><span class="wp-name"><b></b><small></small></span><span class="wp-actions"></span></div><div class="wp-form"><div class="wp-err"></div></div>`;
+      el.querySelector('b').textContent = d.name;
+      el.querySelector('small').textContent = busy
+        ? d.connected
+          ? 'Disconnecting…'
+          : 'Connecting…'
+        : d.connected
+          ? 'Connected'
+          : d.canConnect
+            ? 'Paired'
+            : 'Paired · connects on its own';
+      if (d.canConnect) {
+        const b = document.createElement('button');
+        b.className = 'wp-btn' + (d.connected ? '' : ' primary');
+        b.textContent = d.connected ? 'Disconnect' : 'Connect';
+        b.disabled = !!bt.busy;
+        b.addEventListener('click', () => btConnect(d, !d.connected));
+        el.querySelector('.wp-actions').append(b);
+      }
+      if (bt.errors[d.container]) {
+        el.classList.add('asking');
+        el.querySelector('.wp-err').textContent = bt.errors[d.container];
+      }
+      list.append(el);
+    }
+  }
+
+  async function btConnect(d, on) {
+    bt.busy = d.container;
+    bt.errors[d.container] = '';
+    renderBt();
+    const res = await ccRun({ cmd: 'btConnect', container: d.container, on });
+    bt.busy = null;
+    if (res && res.bt) bt.devices = res.bt.devices || bt.devices;
+    const result = res && res.bt && res.bt.result;
+    if (result !== 'ok') bt.errors[d.container] = 'Couldn’t do that from here. Try Bluetooth settings.';
+    else if (on) showActivity({ icon: 'headphones', sub: 'Bluetooth', title: `Connected to ${d.name}` }, 2000);
+    renderBt();
+  }
+
+  bq('.bt-back').addEventListener('click', closeBt);
+  bq('.bt-refresh').addEventListener('click', () => loadBt());
+  btPanel.querySelectorAll('.wp-more').forEach((b) => b.addEventListener('click', () => frost.openSettings(b.dataset.settings)));
+  bq('.bt-toggle').addEventListener('change', async (e) => {
+    const on = e.target.checked;
     optimistic({ bluetooth: on });
-    ccRun({ cmd: 'setRadio', kind: 'Bluetooth', on });
+    renderBt();
+    await ccRun({ cmd: 'setRadio', kind: 'Bluetooth', on });
+    setTimeout(() => loadBt(true), 1200);
+  });
+
+  // the Bluetooth tile opens the device list (on/off lives in the panel header)
+  document.querySelector('.cc-tile[data-cc="bluetooth"]').addEventListener('click', () => {
+    if (!cc.state || cc.state.bluetooth === null) return;
+    openBt();
+  });
+
+  // ---------- light / dark ----------
+  document.querySelector('.cc-tile[data-cc="dark"]').addEventListener('click', () => {
+    if (!cc.state) return;
+    const on = !cc.state.darkMode;
+    optimistic({ darkMode: on });
+    ccRun({ cmd: 'setDarkMode', on }); // Windows (and FrostShell, when theme = auto) switch together
   });
 
   const modeInfo = {
@@ -1113,6 +1236,7 @@
     osd: onOsd,
     selectTab,
     openWifi: () => openWifi(),
+    openBt: () => openBt(),
     notify: (n) => onNotifications({ list: [n, ...notif.list], fresh: [n] }),
   };
 })();

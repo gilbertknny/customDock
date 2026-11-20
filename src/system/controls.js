@@ -8,9 +8,10 @@ const SCRIPT = path.join(__dirname, 'controls.ps1').replace('app.asar', 'app.asa
 const COMMANDS = [
   'state', 'setVolume', 'setMute', 'setBrightness', 'setRadio', 'setAirplane', 'setLowPower', 'setDnd',
   'wifiList', 'wifiConnect', 'wifiDisconnect', 'wifiForget',
+  'btList', 'btConnect', 'setDarkMode',
 ];
 // scanning and connecting take a while; everything else should answer fast
-const TIMEOUT = { wifiList: 15000, wifiConnect: 30000, wifiDisconnect: 10000 };
+const TIMEOUT = { wifiList: 15000, wifiConnect: 30000, wifiDisconnect: 10000, btList: 12000, btConnect: 20000 };
 
 class Controls {
   constructor() {
@@ -26,7 +27,7 @@ class Controls {
     if (this.demo) {
       this.state = {
         volume: 0.62, muted: false, brightness: 70, wifi: true, bluetooth: true,
-        airplane: false, ssid: 'Rumah_5G', signal: 82, ethernet: false, lowPower: false, dnd: false,
+        airplane: false, ssid: 'Rumah_5G', signal: 82, ethernet: false, lowPower: false, dnd: false, darkMode: true,
       };
     }
   }
@@ -96,6 +97,25 @@ class Controls {
       ];
     }
     const nets = this.demoNets;
+    if (!this.demoBt) {
+      this.demoBt = [
+        { id: 'bt1', name: 'Sony WH-1000XM5', connected: true, kind: 'audio', container: 'c1', canConnect: true },
+        { id: 'bt2', name: 'Galaxy Buds2 Pro', connected: false, kind: 'audio', container: 'c2', canConnect: true },
+        { id: 'bt3', name: 'MX Master 3S', connected: true, kind: 'input', container: 'c3', canConnect: false },
+        { id: 'bt4', name: 'Pixel 8', connected: false, kind: 'phone', container: 'c4', canConnect: false },
+      ];
+    }
+    const bt = () => ({ devices: s.bluetooth ? this.demoBt.map((d) => ({ ...d })) : this.demoBt.map((d) => ({ ...d, connected: false })) });
+    if (req.cmd === 'btList') return { ok: true, bt: bt(), state: { ...s } };
+    if (req.cmd === 'btConnect') {
+      const d = this.demoBt.find((x) => x.container === req.container);
+      if (d && d.canConnect) d.connected = !!req.on;
+      return { ok: true, bt: { ...bt(), result: d && d.canConnect ? 'ok' : 'unsupported' }, state: { ...s } };
+    }
+    if (req.cmd === 'setDarkMode') {
+      s.darkMode = !!req.on;
+      return { ok: true, state: { ...s } };
+    }
     const wifiOut = (extra = {}) => ({ networks: s.wifi ? nets.map((n) => ({ ...n })) : [], ...(s.wifi ? {} : { error: 'off' }), ...extra });
     if (req.cmd === 'wifiList') return { ok: true, wifi: wifiOut(), state: { ...s } };
     if (req.cmd === 'wifiDisconnect') {

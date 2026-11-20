@@ -643,7 +643,7 @@
 }
 .cc-tiles {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(2, 1fr);
   gap: 8px;
 }
 .cc-tile {
@@ -1161,7 +1161,8 @@
   line-height: 1;
   color: var(--fg-dim);
 }
-.page[data-page="controls"].wifi-open .x-cc {
+.page[data-page="controls"].wifi-open .x-cc,
+.page[data-page="controls"].bt-open .x-cc {
   display: none;
 }
 .wifi-panel {
@@ -1169,7 +1170,8 @@
   flex-direction: column;
   gap: 8px;
 }
-.page[data-page="controls"].wifi-open .wifi-panel {
+.page[data-page="controls"].wifi-open .wp-wifi,
+.page[data-page="controls"].bt-open .wp-bt {
   display: flex;
   animation: page-in 0.3s ease;
 }
@@ -1195,7 +1197,8 @@
   width: 16px;
   height: 16px;
 }
-.wp-refresh.spin svg {
+.wp-refresh.spin svg,
+.bt-refresh.spin svg {
   animation: spin 0.9s linear infinite;
 }
 .mini-switch {
@@ -1408,4 +1411,20 @@
 .wp-more:hover {
   color: var(--fg);
   background: var(--fg-faint);
+}
+.cc-tile[data-cc="dark"].on .ti {
+  background: linear-gradient(135deg, #8b7bff, #4c3fd1);
+  box-shadow: 0 4px 12px -4px #6b5bff;
+}
+.bt-foot {
+  display: flex;
+  justify-content: center;
+  gap: 6px;
+}
+.wp-sig.bt svg {
+  width: 19px;
+  height: 19px;
+}
+.wp-net.connected .wp-sig.bt {
+  color: var(--accent);
 }

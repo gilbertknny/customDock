@@ -27,7 +27,7 @@ A MacBook-style notch that hangs from the top edge of the screen: square top, ro
 - **Compact notch** shows the clock, a spinning album-art disc, an equalizer while music plays, and a red **unread badge**
 - **Expanded panel** with three tabs:
   - **Home**: big clock + date, CPU/RAM/battery rings, now-playing card, latest notification, quick actions
-  - **Controls**: ☀️ brightness · 🔊 volume (scroll wheel works) · 🔇 mute · 📶 **Wi-Fi picker** (tap the tile: nearby networks with signal/lock, connect with password, disconnect, forget) · 🦷 Bluetooth · modes **Normal / Airplane / Low power / Focus**. Right-click any control to open its Windows Settings page
+  - **Controls**: ☀️ brightness · 🔊 volume (scroll wheel works) · 🔇 mute · 📶 **Wi-Fi picker** (tap the tile: nearby networks with signal/lock, connect with password, disconnect, forget) · 🦷 **Bluetooth devices** (paired list with type icons; one-click connect/disconnect for headphones, earbuds and speakers) · 🌙 **Dark mode** (switches Windows light/dark) · modes **Normal / Airplane / Low power / Focus**. Right-click any control to open its Windows Settings page
   - **Notifications**: everything in Windows Notification Center, grouped by day, with app icons, *open*, *dismiss* and *clear all*
 - **Media controls** for anything in Windows' media flyout (Spotify, YouTube in Chrome/Edge, Apple Music, VLC…), via the native SMTC API
 - **Volume & brightness OSD**: press the keyboard keys and the notch shows a sleek level bar instead of hunting for Windows' flyout (and the Controls tab stays in sync)
@@ -76,6 +76,9 @@ Prefer something simpler? Switch to **Tint only** mode from the tray.
 <tr>
 <td><img src="docs/magnify.png" alt="Dock magnification" /></td>
 <td><img src="docs/black.png" alt="Black notch" /></td>
+</tr>
+<tr>
+<td colspan="2"><img src="docs/bluetooth.png" alt="Controls tiles and Bluetooth devices" /></td>
 </tr>
 <tr>
 <td colspan="2"><img src="docs/wifi.png" alt="Wi-Fi picker: list, wrong password, connected" /></td>
@@ -189,6 +192,8 @@ Most dock options are in the **Settings** window. Everything else lives in `%APP
 | Volume / mute | Core Audio `IAudioEndpointVolume` | default output device |
 | Brightness | WMI `WmiMonitorBrightness` | built-in laptop screens; external monitors show *N/A* |
 | Wi-Fi / Bluetooth on/off | WinRT `Windows.Devices.Radios` | same as the Quick Settings toggles |
+| Bluetooth devices | WinRT `DeviceInformation` (paired, connected) + KS `ONESHOT_RECONNECT/DISCONNECT` on the device's audio endpoints | connect/disconnect works for Bluetooth audio; mice/keyboards/phones show status and connect on their own |
+| Dark mode | `AppsUseLightTheme` / `SystemUsesLightTheme` + `WM_SETTINGCHANGE` | same switch as *Settings → Personalization → Colors* |
 | Wi-Fi networks | native `wlanapi.dll` (scan, connect, disconnect, forget) | WPA/WPA2/WPA3-Personal and open networks; work/school (802.1X) networks open Windows Settings. Windows 11 24H2+ needs *Location* access to list networks |
 | Airplane | turns every radio off, restores the previous ones when switched off | Windows has no public airplane API |
 | Low power | Windows 11 power mode → *Best power efficiency* | |
@@ -260,7 +265,7 @@ PRs are very welcome!
 
 **FrostShell** itu dock ala macOS + notch ala MacBook buat Windows 11, dengan gaya glassmorphism.
 
-- **Notch**: nempel di tepi atas layar, mengecil pas diam dan membesar saat kursor mendekat. Hover buat buka panel dengan 3 tab: **Home** (jam, musik, CPU/RAM/baterai), **Controls** (kecerahan, volume, mute, WiFi dengan daftar jaringan dan connect pakai password, Bluetooth, mode Normal / Airplane / Low power / Focus), dan **Notifications** (semua notifikasi Windows).
+- **Notch**: nempel di tepi atas layar, mengecil pas diam dan membesar saat kursor mendekat. Hover buat buka panel dengan 3 tab: **Home** (jam, musik, CPU/RAM/baterai), **Controls** (kecerahan, volume, mute, WiFi dengan daftar jaringan dan connect pakai password, Bluetooth dengan daftar perangkat dan connect/disconnect headphone, Dark mode, mode Normal / Airplane / Low power / Focus), dan **Notifications** (semua notifikasi Windows).
 - **Notifikasi baru** turun dari notch sebagai toast selama 6 detik. Hover buat nahan dan muncul tombol Open/Dismiss. Kalau kelewat, ada badge merah di notch, dan pas di-hover langsung kebuka di tab Notifications. Kalau mode Focus nyala, cuma badge aja tanpa pop-up.
 - **Dock**: app yang lagi kebuka otomatis muncul di dock (klik buat nampilin window-nya, klik kanan → *Keep in dock* buat pin), bisa nyembunyiin taskbar Windows (tray → *Hide Windows taskbar*), otomatis sembunyi pas ada app fullscreen, efek magnify, ikon asli bawaan Windows (diseragamkan di atas alas kotak), indikator app yang lagi jalan, drag buat ngatur urutan, auto-hide.
 - **Glass beneran**: wallpaper kamu di-blur di belakang tiap panel, jadi efek kacanya kelihatan nyata, bukan cuma kotak transparan.

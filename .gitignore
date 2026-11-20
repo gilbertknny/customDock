@@ -7,6 +7,7 @@ Thumbs.db
 
 # Salesforce CLI local config
 .sf/
-
 # files delivered by Claude desktop
 Claude outputs/
+# local icon diagnostics (tools/icon-diag.ps1)
+.diag/

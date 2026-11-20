@@ -64,7 +64,10 @@ function candidates(item) {
   if (icon) {
     const res = parseIconSpec(icon);
     if (res) list.push(res);
-    else if (/\.(exe|dll|ico|icl|cpl)$/i.test(icon)) list.push({ kind: 'file', file: icon, index: 0 });
+    else if (/\.(exe|dll|ico|icl|cpl)$/i.test(icon)) {
+      list.push({ kind: 'file', file: icon, index: 0 });
+      list.push({ kind: 'shell', path: icon }); // follows Windows' .mun icon redirection
+    }
   }
 
   let target = expand(item.path);

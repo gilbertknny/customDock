@@ -348,6 +348,26 @@ function pinGroup(key) {
   });
 }
 
+// Default dock entries point at Store apps; on PCs without them (LTSC, debloated,
+// company images) swap in the classic equivalents instead of showing dead icons.
+const STORE_FALLBACKS = {
+  'microsoft.windowsterminal_8wekyb3d8bbwe!app': { name: 'Windows PowerShell', path: '%WINDIR%\\System32\\WindowsPowerShell\\v1.0\\powershell.exe' },
+  'microsoft.windowsnotepad_8wekyb3d8bbwe!app': { name: 'Notepad', path: '%WINDIR%\\System32\\notepad.exe' },
+  'microsoft.windowscalculator_8wekyb3d8bbwe!app': { name: 'Calculator', path: '%WINDIR%\\System32\\calc.exe' },
+};
+function replaceMissingDefaults(list) {
+  const installed = new Set(list.map((a) => String(a.id).toLowerCase()));
+  let changed = false;
+  const items = config.get().dock.items.map((it) => {
+    const id = ((it.path || '').match(/^shell:AppsFolder\\(.+)$/i) || [])[1];
+    const fb = id && STORE_FALLBACKS[id.toLowerCase()];
+    if (!fb || installed.has(id.toLowerCase())) return it;
+    changed = true;
+    return { ...fb };
+  });
+  if (changed) applyConfig(config.update((c) => (c.dock.items = items)));
+}
+
 // ---------- IPC ----------
 // Only our own bundled pages may talk to the main process. If anything else ever got
 // loaded into a window (e.g. a dropped .html file), its IPC calls are ignored.
@@ -625,6 +645,7 @@ app.whenReady().then(() => {
   apps.list({ demo: DEMO }).then((list) => {
     appNames = Object.fromEntries((list || []).map((a) => [String(a.id).toLowerCase(), a.name]));
     publishWindows();
+    if (!DEMO && list && list.length) replaceMissingDefaults(list);
   });
   processes.on('update', (list) => broadcast('running', list));
   stats.on('update', (s) => broadcast('stats', s));

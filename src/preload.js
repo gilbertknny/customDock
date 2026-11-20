@@ -12,6 +12,7 @@ contextBridge.exposeInMainWorld('frost', {
   winActivate: (hwnds) => ipcRenderer.send('win-activate', hwnds),
   winClose: (hwnds) => ipcRenderer.send('win-close', hwnds),
   pin: (key) => ipcRenderer.send('dock-pin', key),
+  winPreviews: (hwnds) => ipcRenderer.invoke('win-previews', hwnds),
   addPaths: (paths) => ipcRenderer.send('dock-add', paths),
   pathForFile: (file) => webUtils.getPathForFile(file),
   reorder: (from, to) => ipcRenderer.send('dock-reorder', from, to),

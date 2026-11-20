@@ -11,7 +11,7 @@
   const sh = num('sh', 1080);
   const kind = location.pathname.includes('/notch/') ? 'notch' : 'dock';
   const winW = kind === 'notch' ? 640 : sw;
-  const winH = kind === 'notch' ? 560 : 193;
+  const winH = kind === 'notch' ? 560 : 383;
   const win = { x: num('x', kind === 'notch' ? (sw - winW) / 2 : 0), y: num('y', kind === 'notch' ? 0 : sh - winH), width: winW, height: winH };
 
   const config = {
@@ -160,6 +160,12 @@
     runningMenu: (k) => console.log('[mock] running menu', k),
     winActivate: (h) => console.log('[mock] activate', h),
     winClose: (h) => console.log('[mock] close', h),
+    winPreviews: async (hwnds) =>
+      hwnds.map((h, i) => ({
+        hwnd: h,
+        title: ['Inbox - Outlook', 'Meeting notes - Outlook', '#general - Discord'][(h + i) % 3],
+        image: h === 103 ? null : 'data:image/svg+xml;utf8,' + encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="440" height="260"><rect width="440" height="260" fill="#f3f4f7"/><rect width="440" height="34" fill="${h % 2 ? '#5865f2' : '#0f6cbd'}"/><rect x="0" y="34" width="110" height="226" fill="#e6e8ee"/><g fill="#c9ced8">${[0, 1, 2, 3, 4, 5].map((r) => `<rect x="126" y="${52 + r * 32}" width="${250 - r * 18}" height="12" rx="6"/>`).join('')}</g><g fill="#cfd4dd">${[0, 1, 2, 3].map((r) => `<rect x="14" y="${54 + r * 28}" width="80" height="10" rx="5"/>`).join('')}</g></svg>`),
+      })),
     pin: (k) => console.log('[mock] pin', k),
     media: (cmd) => {
       if (cmd === 'toggle') media = { ...media, playing: !media.playing };

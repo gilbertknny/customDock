@@ -73,8 +73,8 @@
         island.src = `../src/renderer/notch/index.html?${common}&x=${(W - 640) / 2}&y=0`;
         island.id = 'island';
         const dock = document.createElement('iframe');
-        Object.assign(dock.style, { left: '0px', top: `${H - 193}px`, width: `${W}px`, height: '193px' });
-        dock.src = `../src/renderer/dock/index.html?${common}&x=0&y=${H - 193}`;
+        Object.assign(dock.style, { left: '0px', top: `${H - 383}px`, width: `${W}px`, height: '383px' });
+        dock.src = `../src/renderer/dock/index.html?${common}&x=0&y=${H - 383}`;
         dock.id = 'dock';
         document.body.append(island, dock);
         island.onload = () => {

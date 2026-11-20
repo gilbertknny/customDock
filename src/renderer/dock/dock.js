@@ -171,7 +171,7 @@
     document.body.classList.add('magnifying');
     magnify(e.clientX);
     const el = e.target.closest('.item');
-    if (el) showTip(el);
+    if (el && !(pv.el === el && preview.classList.contains('show'))) showTip(el);
     else tip.classList.remove('show');
     ui.kick();
   });
@@ -193,10 +193,134 @@
     document.body.classList.remove('hidden');
   });
 
+  // ----- hover window previews -----
+  const preview = $('#preview');
+  ui.glassify(preview);
+  const pv = { el: null, timer: null, hideTimer: null, refresh: null, overPreview: false, seq: 0 };
+  const CLOSE = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg>';
+
+  const groupOf = (el) => (el ? el._group || el._running || null : null);
+
+  function iconUrlOf(el) {
+    const img = el && el.querySelector('.tile img');
+    return img ? img.src : '';
+  }
+
+  async function loadPreview(el, first) {
+    const g = groupOf(el);
+    if (!g) return hidePreview(true);
+    const seq = ++pv.seq;
+    let shots = [];
+    try {
+      shots = (await frost.winPreviews(g.hwnds)) || [];
+    } catch {}
+    if (seq !== pv.seq || pv.el !== el) return; // hovered something else meanwhile
+    if (!shots.length) return hidePreview(true);
+    renderPreview(el, shots);
+    if (first) {
+      preview.classList.add('show');
+      placePreview(el);
+      requestAnimationFrame(() => preview.classList.add('in'));
+    }
+  }
+
+  function renderPreview(el, shots) {
+    const icon = iconUrlOf(el);
+    const keepScroll = preview.scrollLeft;
+    preview.replaceChildren();
+    for (const s of shots) {
+      const card = document.createElement('div');
+      card.className = 'pv-card';
+      card.innerHTML = `<div class="pv-head">${icon ? `<img src="${icon}" alt="">` : ''}<span class="pv-title"></span><button class="pv-x" title="Close window">${CLOSE}</button></div><div class="pv-thumb"></div>`;
+      card.querySelector('.pv-title').textContent = s.title || el._item.name;
+      const thumb = card.querySelector('.pv-thumb');
+      if (s.image) {
+        const img = new Image();
+        img.src = s.image;
+        img.alt = '';
+        thumb.append(img);
+      } else {
+        thumb.innerHTML = `<div class="pv-min">${icon ? `<img src="${icon}" alt="">` : ''}<span>Minimized</span></div>`;
+      }
+      card.addEventListener('click', (e) => {
+        if (e.target.closest('.pv-x')) {
+          frost.winClose([s.hwnd]);
+          card.remove();
+          if (!preview.querySelector('.pv-card')) hidePreview(true);
+          else placePreview(el);
+          return;
+        }
+        frost.winActivate([s.hwnd]);
+        hidePreview(true);
+      });
+      preview.append(card);
+    }
+    preview.scrollLeft = keepScroll;
+  }
+
+  function placePreview(el) {
+    const r = el.getBoundingClientRect();
+    const w = preview.offsetWidth;
+    const x = Math.max(12, Math.min(innerWidth - w - 12, r.left + r.width / 2 - w / 2));
+    preview.style.left = `${x}px`;
+    preview.style.bottom = `${innerHeight - r.top + 12}px`;
+    ui.syncGlass();
+  }
+
+  function showPreviewFor(el, immediate) {
+    clearTimeout(pv.timer);
+    clearTimeout(pv.hideTimer);
+    if (pv.el === el && preview.classList.contains('show')) return;
+    const open = preview.classList.contains('show');
+    pv.timer = setTimeout(
+      () => {
+        pv.el = el;
+        tip.classList.remove('show');
+        loadPreview(el, !open).then(() => open && placePreview(el));
+        clearInterval(pv.refresh);
+        pv.refresh = setInterval(() => pv.el && loadPreview(pv.el, false), 1500); // keep thumbnails fresh
+      },
+      immediate || open ? 0 : 450
+    );
+  }
+
+  function hidePreview(now) {
+    clearTimeout(pv.timer);
+    clearTimeout(pv.hideTimer);
+    const go = () => {
+      clearInterval(pv.refresh);
+      pv.el = null;
+      pv.seq++;
+      preview.classList.remove('in');
+      setTimeout(() => !pv.el && preview.classList.remove('show'), 180);
+    };
+    if (now) go();
+    else pv.hideTimer = setTimeout(() => !pv.overPreview && go(), 260);
+  }
+
+  itemsEl.addEventListener('mouseover', (e) => {
+    const el = e.target.closest('.item');
+    if (el && groupOf(el) && dragFrom < 0) showPreviewFor(el);
+    else if (el) {
+      clearTimeout(pv.timer);
+      if (preview.classList.contains('show')) hidePreview(true);
+    }
+  });
+  wrap.addEventListener('mouseleave', () => hidePreview(false));
+  preview.addEventListener('mouseenter', () => {
+    pv.overPreview = true;
+    clearTimeout(pv.hideTimer);
+  });
+  preview.addEventListener('mouseleave', () => {
+    pv.overPreview = false;
+    hidePreview(false);
+  });
+
   // ----- launch & menus -----
   itemsEl.addEventListener('click', (e) => {
     const el = e.target.closest('.item');
     if (!el) return;
+    hidePreview(true);
     if (el._group) return frost.winActivate(el._group.hwnds);
     const idx = Number(el.dataset.index);
     if (el._running && !e.shiftKey) return frost.winActivate(el._running.hwnds); // bring it forward

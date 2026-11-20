@@ -15,6 +15,7 @@ const {
   protocol,
   dialog,
   session,
+  desktopCapturer,
 } = require('electron');
 
 const config = require('./config');
@@ -131,10 +132,12 @@ function baseOptions(extra) {
   };
 }
 
+const PREVIEW_SPACE = 190; // transparent, click-through room for hover previews
+
 function dockBounds(cfg) {
   const d = primary();
   const area = cfg.dock.aboveTaskbar && !cfg.dock.autoHide && !cfg.dock.hideTaskbar ? d.workArea : d.bounds;
-  const height = Math.ceil(cfg.dock.iconSize * cfg.dock.magnification + 110);
+  const height = Math.ceil(cfg.dock.iconSize * cfg.dock.magnification + 110 + PREVIEW_SPACE);
   return { x: d.bounds.x, y: area.y + area.height - height, width: d.bounds.width, height };
 }
 
@@ -318,10 +321,11 @@ function groupWindows(list) {
     if (!g) {
       const exe = w.path ? path.win32.basename(w.path) : null; // Windows paths, even when run elsewhere
       const name = (aumid && appNames[aumid.toLowerCase()]) || w.desc || (exe ? exe.replace(/\.exe$/i, '') : w.title);
-      g = { key, aumid, path: w.path || null, exe, name, hwnds: [] };
+      g = { key, aumid, path: w.path || null, exe, name, hwnds: [], titles: {} };
       groups.set(key, g);
     }
     g.hwnds.push(w.hwnd);
+    g.titles[w.hwnd] = w.title || '';
   }
   return [...groups.values()];
 }
@@ -430,6 +434,29 @@ on('win-close', (_e, hwnds) => {
   if (h.length) shellwatch.send({ cmd: 'close', hwnds: h });
 });
 on('dock-pin', (_e, key) => pinGroup(String(key)));
+
+// Live window thumbnails for the dock's hover preview (only for windows that are open now)
+handle('win-previews', async (_e, hwnds) => {
+  const wanted = knownHwnds(hwnds);
+  if (!wanted.length) return [];
+  const titles = Object.assign({}, ...runningGroups.map((g) => g.titles || {}));
+  let sources = [];
+  try {
+    sources = await desktopCapturer.getSources({ types: ['window'], thumbnailSize: { width: 440, height: 260 }, fetchWindowIcons: false });
+  } catch (err) {
+    console.error('[previews]', err.message);
+  }
+  // window source ids look like "window:<hwnd>:0"
+  const byHwnd = new Map(sources.map((src) => [Number(String(src.id).split(':')[1]), src]));
+  return wanted.map((h) => {
+    const src = byHwnd.get(h);
+    const img = src && src.thumbnail && !src.thumbnail.isEmpty() ? src.thumbnail : null;
+    const size = img ? img.getSize() : null;
+    // minimized windows come back blank (or tiny); show them as "Minimized"
+    const usable = img && size.width > 8 && size.height > 8;
+    return { hwnd: h, title: titles[h] || (src && src.name) || '', image: usable ? img.toDataURL() : null };
+  });
+});
 on('running-menu', (e, key) => {
   const g = runningGroups.find((x) => x.key === key);
   if (!g) return;

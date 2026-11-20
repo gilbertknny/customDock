@@ -14,9 +14,10 @@ contextBridge.exposeInMainWorld('frost', {
   icon: (item) => ipcRenderer.invoke('icon', item),
   media: (cmd) => ipcRenderer.send('media', cmd),
   controls: (req) => ipcRenderer.invoke('controls', req),
-  notifOpen: (n) => ipcRenderer.send('notif-open', n),
+  notifOpen: (id) => ipcRenderer.send('notif-open', id),
   notifDismiss: (ids) => ipcRenderer.send('notif-dismiss', ids),
-  action: (a) => ipcRenderer.send('action', a),
+  action: (index) => ipcRenderer.send('action', index),
+  openSettings: (uri) => ipcRenderer.send('open-settings', uri),
   on: (channel, cb) => {
     if (!CHANNELS.includes(channel)) return () => {};
     const listener = (_e, payload) => cb(payload);

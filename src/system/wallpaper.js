@@ -4,6 +4,9 @@ const fs = require('fs');
 const path = require('path');
 const { execFileSync } = require('child_process');
 const { EventEmitter } = require('events');
+const { nativeImage } = require('electron');
+
+const MAX_WIDTH = 1280; // it's heavily blurred, so full 4K pixels are wasted memory
 
 const DEMO = path.join(__dirname, '..', '..', 'assets', 'demo-wallpaper.jpg');
 
@@ -68,8 +71,18 @@ class Wallpaper extends EventEmitter {
   // used by the frost:// protocol handler
   async response() {
     if (!this.file) return new Response('no wallpaper', { status: 404 });
-    const buf = await fs.promises.readFile(this.file);
-    return new Response(buf, { headers: { 'content-type': sniff(buf), 'cache-control': 'max-age=31536000' } });
+    if (!this.cache || this.cache.version !== this.version) {
+      const buf = await fs.promises.readFile(this.file);
+      let body = buf;
+      let type = sniff(buf);
+      const img = nativeImage.createFromBuffer(buf);
+      if (!img.isEmpty() && img.getSize().width > MAX_WIDTH) {
+        body = img.resize({ width: MAX_WIDTH, quality: 'good' }).toJPEG(88);
+        type = 'image/jpeg';
+      }
+      this.cache = { version: this.version, body, type };
+    }
+    return new Response(this.cache.body, { headers: { 'content-type': this.cache.type, 'cache-control': 'max-age=31536000' } });
   }
 
   stop() {

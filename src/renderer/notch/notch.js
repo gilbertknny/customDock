@@ -345,7 +345,7 @@
   function renderActions() {
     const box = $('.x-actions');
     box.replaceChildren();
-    for (const a of cfg.notch.quickActions || []) {
+    (cfg.notch.quickActions || []).forEach((a, index) => {
       const b = document.createElement('button');
       b.className = 'chip';
       b.innerHTML = `${Icons.glyph(a.icon)}<span></span>`;
@@ -355,12 +355,12 @@
         b.classList.toggle('active', !!timer);
         if (timer) b.querySelector('span').textContent = 'Cancel';
       }
-      b.addEventListener('click', () => runAction(a));
+      b.addEventListener('click', () => runAction(a, index));
       box.append(b);
-    }
+    });
   }
 
-  function runAction(a) {
+  function runAction(a, index) {
     if (a.action === 'timer') {
       if (timer) {
         timer = null;
@@ -374,7 +374,7 @@
       tick();
       return;
     }
-    frost.action(a);
+    frost.action(index);
   }
 
   function finishTimer() {
@@ -589,7 +589,7 @@
     const el = e.target.closest('[data-settings]');
     if (!el) return;
     e.preventDefault();
-    frost.action({ uri: el.dataset.settings });
+    frost.openSettings(el.dataset.settings);
   });
 
   // expanded height follows its content so the spring morph lands exactly
@@ -789,7 +789,7 @@
 
   function openNotif(n) {
     notif.unread.delete(n.id);
-    frost.notifOpen(n);
+    frost.notifOpen(n.id);
     updateBadge();
   }
 

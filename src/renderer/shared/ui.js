@@ -94,6 +94,10 @@
   });
   document.addEventListener('mouseleave', () => setIgnore(true));
 
+  // a file dropped anywhere outside a real drop zone must never navigate the window
+  document.addEventListener('dragover', (e) => e.preventDefault());
+  document.addEventListener('drop', (e) => e.preventDefault());
+
   function boot(init, { onConfig } = {}) {
     applyConfig(init);
     setWallpaper(init.wallpaper);

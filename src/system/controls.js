@@ -64,6 +64,8 @@ class Controls {
     if (!req || !COMMANDS.includes(req.cmd)) return Promise.resolve({ ok: false, error: 'unknown command' });
     if (this.demo) return Promise.resolve(this.runDemo(req));
     this.ensure();
+    clearTimeout(this.idleTimer);
+    this.idleTimer = setTimeout(() => this.stop(), 60000); // free ~60 MB when the panel isn't used
     const id = this.nextId++;
     return new Promise((resolve) => {
       this.pending.set(id, { resolve });
@@ -92,7 +94,8 @@ class Controls {
   }
 
   stop() {
-    if (this.child) this.child.stdin.end();
+    clearTimeout(this.idleTimer);
+    if (this.child) this.child.stdin.end(); // the script exits when stdin closes
   }
 }
 

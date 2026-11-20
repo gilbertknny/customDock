@@ -1,6 +1,7 @@
 // FrostShell — glassmorphism dock + notch for Windows 11.
 const path = require('path');
 const { spawn } = require('child_process');
+const { pathToFileURL } = require('url');
 const {
   app,
   BrowserWindow,
@@ -13,6 +14,7 @@ const {
   nativeTheme,
   protocol,
   dialog,
+  session,
 } = require('electron');
 
 const config = require('./config');
@@ -142,6 +144,9 @@ function createWindow(kind, bounds) {
   const win = new BrowserWindow(baseOptions(bounds));
   win.setAlwaysOnTop(true, 'pop-up-menu');
   win.setIgnoreMouseEvents(true, { forward: true });
+  // never navigate away from our page or open new windows (e.g. a dropped file/link)
+  win.webContents.on('will-navigate', (e) => e.preventDefault());
+  win.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
   win.loadFile(path.join(__dirname, 'renderer', kind, 'index.html'));
   win.once('ready-to-show', () => win.showInactive());
   win.on('closed', () => (windows[kind] = null));
@@ -214,8 +219,18 @@ async function addAppDialog() {
 }
 
 // ---------- IPC ----------
+// Only our own bundled pages may talk to the main process. If anything else ever got
+// loaded into a window (e.g. a dropped .html file), its IPC calls are ignored.
+const RENDERER_ROOT = pathToFileURL(path.join(__dirname, 'renderer')).href;
+const trusted = (e) => (e.senderFrame?.url || '').startsWith(RENDERER_ROOT);
+const on = (ch, fn) => ipcMain.on(ch, (e, ...args) => trusted(e) && fn(e, ...args));
+const handle = (ch, fn) =>
+  ipcMain.handle(ch, (e, ...args) => {
+    if (!trusted(e)) throw new Error('untrusted sender');
+    return fn(e, ...args);
+  });
 
-ipcMain.handle('init', (e) => {
+handle('init', (e) => {
   const kind = Object.keys(windows).find((k) => windows[k] && windows[k].webContents === e.sender);
   const cfg = config.get();
   return {
@@ -232,23 +247,27 @@ ipcMain.handle('init', (e) => {
   };
 });
 
-ipcMain.on('ignore', (e, ignore) => {
+on('ignore', (e, ignore) => {
   const win = BrowserWindow.fromWebContents(e.sender);
   if (win) win.setIgnoreMouseEvents(!!ignore, { forward: true });
 });
 
-ipcMain.on('launch', (_e, index) => launch(config.get().dock.items[index]));
-ipcMain.handle('icon', (_e, item) => icons.iconFor(item || {}));
-ipcMain.on('media', (_e, cmd) => media.command(cmd));
-ipcMain.handle('controls', (_e, req) => controls.run(req));
-ipcMain.on('notif-open', (_e, n) => {
+on('launch', (_e, index) => launch(config.get().dock.items[index]));
+handle('icon', (_e, item) => icons.iconFor(item || {}));
+on('media', (_e, cmd) => media.command(cmd));
+handle('controls', (_e, req) => controls.run(req));
+on('notif-open', (_e, id) => {
   // bring up the app that sent it (Windows doesn't expose the toast's own activation)
-  if (n && n.app && !DEMO) runDetached('explorer.exe', [`shell:AppsFolder\\${n.app}`]);
+  const n = notifications.list.find((x) => x.id === String(id));
+  if (n && n.app && !DEMO) runDetached('explorer.exe', [`shell:AppsFolder\${n.app}`]);
 });
-ipcMain.on('notif-dismiss', (_e, ids) => notifications.dismiss(ids || []));
-ipcMain.on('dock-add', (_e, paths) => addPaths(Array.isArray(paths) ? paths : []));
+on('open-settings', (_e, uri) => {
+  if (typeof uri === 'string' && /^ms-settings:[a-z0-9-]*$/i.test(uri)) shell.openExternal(uri);
+});
+on('notif-dismiss', (_e, ids) => notifications.dismiss(ids || []));
+on('dock-add', (_e, paths) => addPaths(Array.isArray(paths) ? paths : []));
 
-ipcMain.on('dock-reorder', (_e, from, to) => {
+on('dock-reorder', (_e, from, to) => {
   updateItems((list) => {
     if (from < 0 || from >= list.length || to < 0 || to >= list.length) return;
     const [it] = list.splice(from, 1);
@@ -256,14 +275,16 @@ ipcMain.on('dock-reorder', (_e, from, to) => {
   });
 });
 
-ipcMain.on('action', (_e, a) => {
+on('action', (_e, index) => {
+  // only quick actions defined in the user's own config can be run
+  const a = (config.get().notch.quickActions || [])[index];
   if (!a) return;
   if (a.uri && /^shell:/i.test(a.uri)) runDetached('explorer.exe', [a.uri]);
   else if (a.uri) shell.openExternal(a.uri);
   else if (a.path) runDetached(expandPath(a.path), (a.args || []).map(expandPath));
 });
 
-ipcMain.on('dock-menu', (e, index) => {
+on('dock-menu', (e, index) => {
   const win = BrowserWindow.fromWebContents(e.sender);
   const cfg = config.get();
   const item = index >= 0 ? cfg.dock.items[index] : null;
@@ -362,6 +383,10 @@ function createTray() {
 // ---------- lifecycle ----------
 
 app.whenReady().then(() => {
+  // no camera/mic/geolocation/notifications/etc. for any page, ever
+  session.defaultSession.setPermissionRequestHandler((_wc, _perm, cb) => cb(false));
+  session.defaultSession.setPermissionCheckHandler(() => false);
+
   protocol.handle('frost', (req) => {
     const url = new URL(req.url);
     if (url.host === 'wallpaper') return wallpaper.response();

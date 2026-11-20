@@ -180,6 +180,21 @@ Everything lives in `%APPDATA%\FrostShell\config.json` (tray → *Edit config…
 
 ---
 
+## 💻 Requirements & performance
+- **OS:** Windows 10 1809+ (best on Windows 11 22H2+). x64 or ARM64.
+- **RAM:** runs comfortably on **8 GB**. Expect roughly **300–500 MB** total (Electron + the media bridge). The quick-settings bridge only runs while you use the Controls tab and exits after 60 s idle.
+- **CPU:** close to 0 % at rest. Animations and blur run on the GPU; the wallpaper is downscaled to 1280 px before blurring.
+- **GPU:** any integrated GPU from the last ~8 years (Intel UHD / Vega). On very old iGPUs, switch the tray's *Glass effect* to **Tint only**.
+
+## 🔒 Security & privacy
+- **No network access at all.** No telemetry, no auto-updater, no remote content. Notifications, media info and stats never leave your PC.
+- **No admin rights.** Everything runs as your user; the only system setting written is the per-user "notifications off" flag for Focus.
+- **Electron hardening:** `contextIsolation`, `sandbox`, no `nodeIntegration`, strict CSP, navigation and new windows blocked, all permissions denied, and IPC accepted only from FrostShell's own bundled pages.
+- **Least privilege over IPC:** the UI can only ask for *configured* dock items and quick actions by index, `ms-settings:` pages, and fixed media/control commands, never arbitrary programs.
+- **Notifications are read-only.** FrostShell reads Windows' notification database but never modifies it.
+- **Zero runtime npm dependencies** (only Electron itself). PowerShell bridges are plain scripts in `src/system/` you can read.
+- **Unsigned builds** will trigger SmartScreen. Build from source if you prefer.
+
 ## 🧱 How it works
 
 ```

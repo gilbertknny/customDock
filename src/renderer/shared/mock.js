@@ -120,7 +120,8 @@
       else media = { ...media, key: String(Math.random()), title: cmd === 'next' ? 'Midnight Frost' : 'Soft Focus', artist: 'Neon Drift', position: 0 };
       emit('media', media);
     },
-    action: (a) => console.log('[mock] action', a),
+    action: (i) => console.log('[mock] action', i),
+    openSettings: (u) => console.log('[mock] settings', u),
     notifOpen: (n) => console.log('[mock] open', n),
     notifDismiss: (ids) => console.log('[mock] dismiss', ids),
     controls: async (req) => {

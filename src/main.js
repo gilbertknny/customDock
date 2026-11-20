@@ -26,6 +26,7 @@ const icons = require('./system/icons');
 const controls = require('./system/controls');
 const notifications = require('./system/notifications');
 const shellwatch = require('./system/shellwatch');
+const apps = require('./system/apps');
 
 const DEMO = process.argv.includes('--demo');
 const ASSETS = path.join(__dirname, '..', 'assets');
@@ -46,6 +47,7 @@ app.commandLine.appendSwitch('disable-features', 'CalculateNativeWinOcclusion');
 const windows = { dock: null, notch: null };
 let tray = null;
 let hiddenForFullscreen = false;
+let settingsWin = null;
 
 // ---------- helpers ----------
 
@@ -69,7 +71,7 @@ function primary() {
 }
 
 function broadcast(channel, payload) {
-  for (const w of Object.values(windows)) {
+  for (const w of [...Object.values(windows), settingsWin]) {
     if (w && !w.isDestroyed()) w.webContents.send(channel, payload);
   }
 }
@@ -199,6 +201,73 @@ function geometry(kind) {
   return { display: d.bounds, window: w ? w.getBounds() : null };
 }
 
+// ---------- settings window ----------
+
+function openSettings() {
+  if (settingsWin && !settingsWin.isDestroyed()) {
+    settingsWin.show();
+    settingsWin.focus();
+    return;
+  }
+  const isWin = process.platform === 'win32';
+  settingsWin = new BrowserWindow({
+    width: 1000,
+    height: 700,
+    minWidth: 840,
+    minHeight: 560,
+    title: 'FrostShell Settings',
+    show: false,
+    autoHideMenuBar: true,
+    icon: path.join(ASSETS, 'icon.png'),
+    // Windows 11 Mica behind the page; plain dark elsewhere
+    backgroundColor: isWin ? '#00000000' : '#1c1e26',
+    ...(isWin ? { backgroundMaterial: 'mica' } : {}),
+    webPreferences: {
+      preload: path.join(__dirname, 'preload.js'),
+      contextIsolation: true,
+      nodeIntegration: false,
+      sandbox: true,
+      spellcheck: false,
+    },
+  });
+  settingsWin.removeMenu();
+  settingsWin.webContents.on('will-navigate', (e) => e.preventDefault());
+  settingsWin.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
+  settingsWin.loadFile(path.join(__dirname, 'renderer', 'settings', 'index.html'));
+  settingsWin.once('ready-to-show', () => settingsWin.show());
+  settingsWin.on('closed', () => (settingsWin = null));
+  if (process.argv.includes('--devtools')) settingsWin.webContents.openDevTools({ mode: 'detach' });
+}
+
+// Settings may only write well-formed dock items and known options.
+function sanitizeItems(items) {
+  if (!Array.isArray(items)) return null;
+  const out = [];
+  for (const it of items.slice(0, 80)) {
+    if (!it || typeof it !== 'object') continue;
+    if (it.type === 'separator') {
+      out.push({ type: 'separator' });
+      continue;
+    }
+    if (typeof it.name !== 'string' || typeof it.path !== 'string' || !it.path.trim()) continue;
+    const clean = { name: it.name.slice(0, 80), path: it.path.slice(0, 1024) };
+    if (Array.isArray(it.args)) clean.args = it.args.filter((a) => typeof a === 'string').slice(0, 20);
+    if (typeof it.icon === 'string' && it.icon) clean.icon = it.icon.slice(0, 1024);
+    if (it.process === false || (typeof it.process === 'string' && it.process)) clean.process = it.process;
+    out.push(clean);
+  }
+  return out;
+}
+
+const DOCK_OPTIONS = {
+  iconSize: (v) => typeof v === 'number' && v >= 32 && v <= 80,
+  magnification: (v) => typeof v === 'number' && v >= 1 && v <= 2.2,
+  autoHide: (v) => typeof v === 'boolean',
+  aboveTaskbar: (v) => typeof v === 'boolean',
+  hideTaskbar: (v) => typeof v === 'boolean',
+  iconStyle: (v) => v === 'square' || v === 'plain',
+};
+
 // ---------- dock editing ----------
 
 function updateItems(fn) {
@@ -246,7 +315,10 @@ const handle = (ch, fn) =>
   });
 
 handle('init', (e) => {
-  const kind = Object.keys(windows).find((k) => windows[k] && windows[k].webContents === e.sender);
+  const kind =
+    settingsWin && settingsWin.webContents === e.sender
+      ? 'settings'
+      : Object.keys(windows).find((k) => windows[k] && windows[k].webContents === e.sender);
   const cfg = config.get();
   return {
     kind,
@@ -281,6 +353,34 @@ on('open-settings', (_e, uri) => {
 });
 on('notif-dismiss', (_e, ids) => notifications.dismiss(ids || []));
 on('dock-add', (_e, paths) => addPaths(Array.isArray(paths) ? paths : []));
+handle('apps-list', (_e, refresh) => apps.list({ demo: DEMO, refresh: !!refresh }));
+handle('dock-set-items', (_e, items) => {
+  const clean = sanitizeItems(items);
+  if (!clean) return false;
+  applyConfig(config.update((c) => (c.dock.items = clean)));
+  return true;
+});
+handle('dock-set-options', (_e, opts) => {
+  if (!opts || typeof opts !== 'object') return false;
+  const next = config.update((c) => {
+    for (const [k, v] of Object.entries(opts)) if (DOCK_OPTIONS[k] && DOCK_OPTIONS[k](v)) c.dock[k] = v;
+  });
+  applyConfig(next);
+  return true;
+});
+handle('browse-apps', async (e) => {
+  const res = await dialog.showOpenDialog(BrowserWindow.fromWebContents(e.sender), {
+    title: 'Choose an app for the dock',
+    properties: ['openFile', 'multiSelections'],
+    filters: [
+      { name: 'Apps & shortcuts', extensions: ['exe', 'lnk', 'url', 'bat', 'cmd'] },
+      { name: 'All files', extensions: ['*'] },
+    ],
+  });
+  if (res.canceled) return [];
+  return res.filePaths.map((p) => ({ name: path.basename(p).replace(/\.(lnk|exe|url|bat|cmd)$/i, ''), path: p }));
+});
+on('open-settings-window', () => openSettings());
 
 on('dock-reorder', (_e, from, to) => {
   updateItems((list) => {
@@ -321,7 +421,8 @@ on('dock-menu', (e, index) => {
   }
   if (tpl.length) tpl.push({ type: 'separator' });
   tpl.push(
-    { label: 'Add app…', click: addAppDialog },
+    { label: 'Add apps…', click: openSettings },
+    { label: 'Browse for an app…', click: addAppDialog },
     { label: 'Add separator', click: () => updateItems((l) => l.push({ type: 'separator' })) },
     {
       label: 'Auto-hide dock',
@@ -330,7 +431,7 @@ on('dock-menu', (e, index) => {
       click: () => applyConfig(config.update((c) => (c.dock.autoHide = !c.dock.autoHide))),
     },
     { type: 'separator' },
-    { label: 'Edit config…', click: () => shell.openPath(config.file()) },
+    { label: 'Dock settings…', click: openSettings },
     { label: 'Quit FrostShell', click: () => app.quit() }
   );
   Menu.buildFromTemplate(tpl).popup({ window: win });
@@ -350,7 +451,8 @@ function rebuildTray() {
       { label: 'Dock', type: 'checkbox', checked: cfg.dock.enabled, click: set((c) => (c.dock.enabled = !c.dock.enabled)) },
       { label: 'Notch', type: 'checkbox', checked: cfg.notch.enabled, click: set((c) => (c.notch.enabled = !c.notch.enabled)) },
       { label: 'Auto-hide dock', type: 'checkbox', checked: cfg.dock.autoHide, click: set((c) => (c.dock.autoHide = !c.dock.autoHide)) },
-      { label: 'Add app to dock…', click: addAppDialog },
+      { label: 'Settings…', click: openSettings },
+      { label: 'Add apps to dock…', click: openSettings },
       {
         label: 'Hide Windows taskbar',
         type: 'checkbox',
@@ -450,9 +552,7 @@ app.whenReady().then(() => {
   applyConfig(cfg);
 });
 
-app.on('second-instance', () => {
-  if (tray) tray.popUpContextMenu();
-});
+app.on('second-instance', () => openSettings()); // launching FrostShell again opens Settings
 
 app.on('window-all-closed', (e) => e.preventDefault()); // keep running in tray
 

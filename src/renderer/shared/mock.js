@@ -81,6 +81,12 @@
     Downloads: '<circle cx="40" cy="40" r="30" fill="#6366f1"/><path d="M40 24v26M29 40l11 11 11-11M27 58h26" stroke="#fff" stroke-width="5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>',
     bin: '<path d="M22 24h36l-3 44a5 5 0 0 1-5 4H30a5 5 0 0 1-5-4z" fill="#dfe8f5" stroke="#8fa3c0" stroke-width="2"/><rect x="17" y="16" width="46" height="8" rx="3" fill="#8fa3c0"/>',
   };
+  const DEMO_APPS = ['Calculator', 'Camera', 'Discord', 'Excel', 'File Explorer', 'Figma', 'Google Chrome', 'Mail', 'Microsoft Edge', 'Microsoft Teams', 'Notepad', 'Notion', 'Paint', 'Photos', 'Settings', 'Slack', 'Spotify', 'Terminal', 'Visual Studio Code', 'WhatsApp', 'Word'];
+  const DEMO_ICON = {
+    'demo.Calculator': 'calc', 'demo.FileExplorer': 'folder', 'demo.GoogleChrome': 'globe', 'demo.MicrosoftEdge': 'globe',
+    'demo.Notepad': 'note', 'demo.Settings': 'gear', 'demo.Spotify': 'music', 'demo.Terminal': 'terminal',
+    'demo.VisualStudioCode': 'code', 'demo.WhatsApp': 'Messages', 'demo.Mail': 'Mail', 'demo.Discord': 'Messages',
+  };
   const sampleIcon = (k) =>
     SAMPLE[k] ? 'data:image/svg+xml;utf8,' + encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 80">${SAMPLE[k]}</svg>`) : null;
 
@@ -115,7 +121,23 @@
       config.dock.items.splice(b, 0, it);
       emit('config', { config, theme: config.theme });
     },
-    icon: async (item) => sampleIcon(String(item.path || '').replace(/^shell:AppsFolder\\/, '')),
+    icon: async (item) => {
+      const k = String(item.path || '').replace(/^shell:AppsFolder\\/, '');
+      return sampleIcon(DEMO_ICON[k] || k);
+    },
+    appsList: async () => DEMO_APPS.map((name) => ({ name, id: `demo.${name.replace(/\W/g, '')}`, exe: null })),
+    setDockItems: async (items) => {
+      config.dock.items = items;
+      emit('config', { config, theme: config.theme });
+      return true;
+    },
+    setDockOptions: async (o) => {
+      Object.assign(config.dock, o);
+      emit('config', { config, theme: config.theme });
+      return true;
+    },
+    browseApps: async () => [],
+    openSettingsWindow: () => {},
     media: (cmd) => {
       if (cmd === 'toggle') media = { ...media, playing: !media.playing };
       else media = { ...media, key: String(Math.random()), title: cmd === 'next' ? 'Midnight Frost' : 'Soft Focus', artist: 'Neon Drift', position: 0 };

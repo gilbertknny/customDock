@@ -44,12 +44,13 @@ A MacBook-style notch that hangs from the top edge of the screen: square top, ro
 > Notifications are read from Windows' own notification database (read-only), so you get every app's notifications, including chat avatars. *Dismiss* hides them in FrostShell only. To avoid seeing each one twice, turn off **Show notification banners** for chatty apps in *Settings → System → Notifications*; they still reach Notification Center and FrostShell.
 
 ### 🚀 Dock
+- **Settings window** (tray → *Settings…*, or right-click the dock): search every installed app (Start menu, Store and desktop apps) and click **Add**, drag to reorder, remove, add separators, or **Browse…** for any `.exe`. Icon size, magnification, auto-hide and taskbar hiding live there too, all applied instantly
 - **macOS-style magnification** with smooth cosine falloff
 - **Native Windows icons** for everything (Win32 `.exe`/`.lnk`, Microsoft Store apps, Settings, Recycle Bin…), extracted at up to 256 px so they stay sharp when magnified
 - **Uniform square plates**: every icon sits on the same rounded-square glass tile, so mixed icon shapes line up neatly (`"iconStyle": "plain"` turns it off)
 - **Running indicators** (dot under apps that are open)
 - **Launch bounce** animation
-- **Drag to reorder**, right-click → *Add app…*, *Remove*, *Show file location*, *Add separator*
+- **Drag to reorder** on the dock itself, right-click → *Add apps…*, *Remove*, *Show file location*, *Add separator*
 - **Auto-hide** with a bottom hot-edge
 - **Hide the Windows taskbar** (tray → *Hide Windows taskbar*): no more double bar. It always comes back when FrostShell quits, even after a crash
 - **Steps aside for fullscreen**: dock and notch hide during games, fullscreen video and presentations
@@ -72,6 +73,9 @@ Prefer something simpler? Switch to **Tint only** mode from the tray.
 <tr>
 <td><img src="docs/magnify.png" alt="Dock magnification" /></td>
 <td><img src="docs/black.png" alt="Black notch" /></td>
+</tr>
+<tr>
+<td colspan="2"><img src="docs/settings.png" alt="Settings window" /></td>
 </tr>
 </table>
 
@@ -104,7 +108,7 @@ Requires **Node.js 20+** and **Windows 10 1809+ / Windows 11** (best on 11).
 
 ## ⚙️ Configuration
 
-Everything lives in `%APPDATA%\FrostShell\config.json` (tray → *Edit config…*). Changes apply **live** when you save.
+Most dock options are in the **Settings** window. Everything else lives in `%APPDATA%\FrostShell\config.json` (tray → *Edit config…*). Changes apply **live** when you save.
 
 ```jsonc
 {
@@ -237,7 +241,7 @@ src/
 - [ ] Inline reply / toast action buttons
 - [ ] Wi-Fi network picker
 - [ ] Native acrylic/mica mode (blur real windows, not only the wallpaper)
-- [ ] Settings GUI
+- [ ] Settings pages for the notch & notifications
 - [ ] Window previews on dock hover
 
 PRs are very welcome!
@@ -252,6 +256,8 @@ PRs are very welcome!
 - **Notifikasi baru** turun dari notch sebagai toast selama 6 detik. Hover buat nahan dan muncul tombol Open/Dismiss. Kalau kelewat, ada badge merah di notch, dan pas di-hover langsung kebuka di tab Notifications. Kalau mode Focus nyala, cuma badge aja tanpa pop-up.
 - **Dock**: bisa nyembunyiin taskbar Windows (tray → *Hide Windows taskbar*), otomatis sembunyi pas ada app fullscreen, efek magnify, ikon asli bawaan Windows (diseragamkan di atas alas kotak), indikator app yang lagi jalan, drag buat ngatur urutan, auto-hide.
 - **Glass beneran**: wallpaper kamu di-blur di belakang tiap panel, jadi efek kacanya kelihatan nyata, bukan cuma kotak transparan.
+
+Tambah app ke dock: klik kanan ikon tray → *Settings…*, cari app-nya, klik **Add**.
 
 Cara pakai: `npm install` lalu `npm start`. Pengaturan ada di `%APPDATA%\FrostShell\config.json` (klik kanan ikon tray → *Edit config…*). Saran: nyalakan *auto-hide taskbar* Windows biar dock-nya bisa nempel di bawah.
 

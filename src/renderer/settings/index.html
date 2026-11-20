@@ -1,0 +1,100 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; img-src 'self' data: file:; style-src 'self' 'unsafe-inline'; script-src 'self'"
+    />
+    <title>FrostShell Settings</title>
+    <link rel="stylesheet" href="settings.css" />
+  </head>
+  <body class="theme-dark">
+    <aside class="side">
+      <div class="brand">
+        <img src="../../../assets/icon.png" alt="" />
+        <div><b>FrostShell</b><small>Settings</small></div>
+      </div>
+      <nav>
+        <a href="#apps" class="on" data-nav="apps"><span class="ni"></span>Dock apps</a>
+        <a href="#look" data-nav="look"><span class="ni"></span>Dock appearance</a>
+      </nav>
+      <p class="side-note">Changes apply instantly. Right-click the dock or the tray icon to come back here.</p>
+    </aside>
+
+    <main>
+      <section id="apps">
+        <header class="page-head">
+          <h1>Dock apps</h1>
+          <p>Pick apps from your PC, drag to reorder, and remove what you don't need.</p>
+        </header>
+
+        <div class="cols">
+          <div class="card">
+            <div class="card-head">
+              <h2>In your dock <span class="count" id="dock-count"></span></h2>
+              <div class="head-actions">
+                <button class="btn ghost" id="add-sep" title="Add a divider line">+ Separator</button>
+              </div>
+            </div>
+            <ol class="dock-list" id="dock-list"></ol>
+            <p class="hint">Drag ⠿ to reorder · the first separator splits apps from folders/Recycle Bin</p>
+          </div>
+
+          <div class="card">
+            <div class="card-head">
+              <h2>Add apps</h2>
+              <div class="head-actions">
+                <button class="btn ghost" id="refresh" title="Reload installed apps">↻</button>
+                <button class="btn" id="browse">Browse…</button>
+              </div>
+            </div>
+            <label class="search">
+              <span class="si"></span>
+              <input id="search" type="search" placeholder="Search installed apps" autocomplete="off" />
+            </label>
+            <ul class="app-list" id="app-list"></ul>
+            <div class="empty" id="apps-empty">Loading installed apps…</div>
+          </div>
+        </div>
+      </section>
+
+      <section id="look">
+        <header class="page-head">
+          <h1>Dock appearance</h1>
+        </header>
+        <div class="card rows">
+          <div class="row">
+            <div><b>Icon size</b><small>How big icons are at rest</small></div>
+            <div class="ctl"><input type="range" id="iconSize" min="36" max="72" step="1" /><output id="iconSize-v"></output></div>
+          </div>
+          <div class="row">
+            <div><b>Magnification</b><small>How much icons grow under the cursor (1× = off)</small></div>
+            <div class="ctl"><input type="range" id="magnification" min="1" max="2" step="0.05" /><output id="magnification-v"></output></div>
+          </div>
+          <div class="row">
+            <div><b>Uniform square icons</b><small>Put every icon on the same rounded glass tile</small></div>
+            <div class="ctl"><label class="switch"><input type="checkbox" id="iconStyle" /><i></i></label></div>
+          </div>
+          <div class="row">
+            <div><b>Auto-hide dock</b><small>Slide away until the cursor reaches the bottom edge</small></div>
+            <div class="ctl"><label class="switch"><input type="checkbox" id="autoHide" /><i></i></label></div>
+          </div>
+          <div class="row">
+            <div><b>Hide Windows taskbar</b><small>Use the dock instead. The taskbar always returns when FrostShell quits</small></div>
+            <div class="ctl"><label class="switch"><input type="checkbox" id="hideTaskbar" /><i></i></label></div>
+          </div>
+          <div class="row" id="row-above">
+            <div><b>Sit above the taskbar</b><small>Keep the dock above the Windows taskbar instead of over it</small></div>
+            <div class="ctl"><label class="switch"><input type="checkbox" id="aboveTaskbar" /><i></i></label></div>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <div class="toast" id="toast"></div>
+
+    <script src="../shared/mock.js"></script>
+    <script src="settings.js"></script>
+  </body>
+</html>

@@ -11,7 +11,7 @@
   const sh = num('sh', 1080);
   const kind = location.pathname.includes('/island/') ? 'island' : 'dock';
   const winW = kind === 'island' ? 620 : sw;
-  const winH = kind === 'island' ? 320 : 193;
+  const winH = kind === 'island' ? 500 : 193;
   const win = { x: num('x', kind === 'island' ? (sw - winW) / 2 : 0), y: num('y', kind === 'island' ? 0 : sh - winH), width: winW, height: winH };
 
   const config = {
@@ -41,6 +41,8 @@
     island: {
       enabled: true,
       style: q.get('style') || 'glass',
+      idleScale: 0.7,
+      proximity: 240,
       clock24h: true,
       showSeconds: false,
       expandOnHover: true,
@@ -76,6 +78,8 @@
   const sampleIcon = (k) =>
     SAMPLE[k] ? 'data:image/svg+xml;utf8,' + encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 80">${SAMPLE[k]}</svg>`) : null;
 
+  const ccState = { volume: 0.62, muted: false, brightness: 70, wifi: true, bluetooth: true, airplane: false, ssid: 'Rumah_5G', signal: 82, ethernet: false, lowPower: false, dnd: true };
+
   window.frost = {
     init: async () => ({
       kind,
@@ -106,6 +110,18 @@
       emit('media', media);
     },
     action: (a) => console.log('[mock] action', a),
+    controls: async (req) => {
+      const c = ccState;
+      if (req.cmd === 'setVolume') (c.volume = req.value), (c.muted = false);
+      if (req.cmd === 'setMute') c.muted = !!req.value;
+      if (req.cmd === 'setBrightness') c.brightness = req.value;
+      if (req.cmd === 'setRadio') c[req.kind === 'WiFi' ? 'wifi' : 'bluetooth'] = !!req.on;
+      if (req.cmd === 'setAirplane') (c.airplane = !!req.on), (c.wifi = !req.on), (c.bluetooth = !req.on);
+      if (req.cmd === 'setLowPower') c.lowPower = !!req.on;
+      if (req.cmd === 'setDnd') c.dnd = !!req.on;
+      c.ssid = c.wifi ? 'Rumah_5G' : null;
+      return { ok: true, state: { ...c } };
+    },
     on: (ch, cb) => {
       (listeners[ch] = listeners[ch] || []).push(cb);
       return () => {};

@@ -21,6 +21,7 @@ const processes = require('./system/processes');
 const stats = require('./system/stats');
 const wallpaper = require('./system/wallpaper');
 const icons = require('./system/icons');
+const controls = require('./system/controls');
 
 const DEMO = process.argv.includes('--demo');
 const ASSETS = path.join(__dirname, '..', 'assets');
@@ -132,7 +133,7 @@ function dockBounds(cfg) {
 function islandBounds() {
   const d = primary();
   const width = 620;
-  const height = 320;
+  const height = 500;
   return { x: Math.round(d.bounds.x + (d.bounds.width - width) / 2), y: d.bounds.y, width, height };
 }
 
@@ -237,6 +238,7 @@ ipcMain.on('ignore', (e, ignore) => {
 ipcMain.on('launch', (_e, index) => launch(config.get().dock.items[index]));
 ipcMain.handle('icon', (_e, item) => icons.iconFor(item || {}));
 ipcMain.on('media', (_e, cmd) => media.command(cmd));
+ipcMain.handle('controls', (_e, req) => controls.run(req));
 ipcMain.on('dock-add', (_e, paths) => addPaths(Array.isArray(paths) ? paths : []));
 
 ipcMain.on('dock-reorder', (_e, from, to) => {
@@ -362,6 +364,7 @@ app.whenReady().then(() => {
   const cfg = config.load();
   wallpaper.start({ demo: DEMO });
   media.start({ demo: DEMO });
+  controls.start({ demo: DEMO });
   processes.start();
   stats.start();
 
@@ -391,6 +394,7 @@ app.on('window-all-closed', (e) => e.preventDefault()); // keep running in tray
 
 app.on('will-quit', () => {
   media.stop();
+  controls.stop();
   processes.stop();
   stats.stop();
   wallpaper.stop();

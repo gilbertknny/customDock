@@ -21,9 +21,15 @@ macOS-style magnifying dock and an iPhone-style Dynamic Island with media contro
 ## ✨ Features
 
 ### 🏝️ Dynamic Island
+- **Shrinks when idle, grows as your cursor approaches** (proximity magnification, like the dock), then expands on hover
 - **Compact pill** with the clock, a spinning album-art disc, and an equalizer while music plays
-- **Hover to expand**: big clock + date, CPU/RAM/battery rings, a now-playing card, and quick actions
+- **Hover to expand**: big clock + date, CPU/RAM/battery rings, a now-playing card, **control center**, and quick actions
 - **Media controls** for anything that shows up in Windows' media flyout (Spotify, YouTube in Chrome/Edge, Apple Music, VLC, Media Player…), via the native SMTC API
+- **Control center** inside the island:
+  - ☀️ brightness slider · 🔊 volume slider (scroll wheel works too) · 🔇 mute / unmute
+  - 📶 Wi-Fi toggle (shows the connected network) · 🦷 Bluetooth toggle
+  - Modes: **Normal**, **Airplane**, **Low power**, **Focus / Do not disturb**
+  - Right-click any control to open its Windows Settings page
 - **Live activities** that morph the island:
   - 🎵 track changed → "Now playing"
   - ⚡ charger plugged / unplugged
@@ -117,6 +123,8 @@ Everything lives in `%APPDATA%\FrostShell\config.json` (tray → *Edit config…
   "island": {
     "enabled": true,
     "style": "glass",              // glass | black
+    "idleScale": 0.7,              // size at rest (1 = never shrink)
+    "proximity": 240,              // px: cursor distance where growing starts
     "clock24h": true,
     "showSeconds": false,
     "expandOnHover": true,         // false = click to expand
@@ -140,6 +148,17 @@ Everything lives in `%APPDATA%\FrostShell\config.json` (tray → *Edit config…
 | `icon` | Optional override. By default the app's own Windows icon is used. Accepts `.png/.ico/.jpg`, or a resource like `%WINDIR%\\System32\\imageres.dll,-55` |
 | `process` | Process name for the running dot. Defaults to the exe name; `false` disables it |
 
+**How the controls work** (no admin rights needed, all through one PowerShell bridge):
+
+| Control | Implementation | Note |
+|---|---|---|
+| Volume / mute | Core Audio `IAudioEndpointVolume` | default output device |
+| Brightness | WMI `WmiMonitorBrightness` | built-in laptop screens; external monitors show *N/A* |
+| Wi-Fi / Bluetooth | WinRT `Windows.Devices.Radios` | same as the Quick Settings toggles |
+| Airplane | turns every radio off, restores the previous ones when switched off | Windows has no public airplane API |
+| Low power | Windows 11 power mode → *Best power efficiency* | |
+| Focus | global "notifications off" setting | |
+
 **Quick action icons:** `scissors`, `timer`, `lock`, `gear`, `music`, `bolt`, `plug`, `battery`.
 
 > 💡 Tip: find a Store app's AUMID with `Get-StartApps` in PowerShell.
@@ -157,6 +176,7 @@ src/
 │   ├── media.ps1        # WinRT SMTC bridge (now playing + controls)
 │   ├── media.js         # long-running PowerShell watcher, art cache
 │   ├── icons.ps1/.js    # native Windows icon extraction (exe/dll + Store apps)
+│   ├── controls.ps1/.js # volume, brightness, radios, power mode, focus
 │   ├── wallpaper.js     # finds & watches the current wallpaper
 │   ├── processes.js     # running-app detection (tasklist)
 │   └── stats.js         # CPU / RAM
@@ -177,7 +197,8 @@ src/
 - [ ] Left/right dock positions
 - [ ] Hide over fullscreen apps & games
 - [ ] Notification mirroring in the island
-- [ ] Volume / brightness OSD replacement
+- [ ] Volume / brightness OSD replacement (show hardware-key changes in the island)
+- [ ] Wi-Fi network picker
 - [ ] Native acrylic/mica mode (blur real windows, not only the wallpaper)
 - [ ] Settings GUI
 - [ ] Window previews on dock hover
@@ -190,7 +211,7 @@ PRs are very welcome!
 
 **FrostShell** itu dock ala macOS + Dynamic Island ala iPhone buat Windows 11, dengan gaya glassmorphism.
 
-- **Island**: jam, kontrol musik (Spotify/YouTube/dll.), notifikasi charging, timer, CPU/RAM/baterai. Hover buat expand.
+- **Island**: mengecil pas diam dan membesar pelan-pelan saat kursor mendekat. Isinya jam, kontrol musik (Spotify/YouTube/dll.), notifikasi charging, timer, CPU/RAM/baterai, plus **control center**: kecerahan, volume, mute, WiFi, Bluetooth, dan mode Normal / Airplane / Low power / Focus (Do Not Disturb). Hover buat expand.
 - **Dock**: efek magnify, ikon asli bawaan Windows (diseragamkan di atas alas kotak), indikator app yang lagi jalan, drag buat ngatur urutan, auto-hide.
 - **Glass beneran**: wallpaper kamu di-blur di belakang tiap panel, jadi efek kacanya kelihatan nyata, bukan cuma kotak transparan.
 

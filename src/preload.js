@@ -13,6 +13,7 @@ contextBridge.exposeInMainWorld('frost', {
   reorder: (from, to) => ipcRenderer.send('dock-reorder', from, to),
   icon: (item) => ipcRenderer.invoke('icon', item),
   media: (cmd) => ipcRenderer.send('media', cmd),
+  controls: (req) => ipcRenderer.invoke('controls', req),
   action: (a) => ipcRenderer.send('action', a),
   on: (channel, cb) => {
     if (!CHANNELS.includes(channel)) return () => {};

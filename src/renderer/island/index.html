@@ -64,6 +64,37 @@
           </div>
         </div>
 
+        <!-- control center -->
+        <div class="x-cc">
+          <div class="cc-tiles">
+            <button class="cc-tile" data-cc="wifi" data-settings="ms-settings:network-wifi">
+              <span class="ti"></span><span class="tl"><b>Wi-Fi</b><small></small></span>
+            </button>
+            <button class="cc-tile" data-cc="bluetooth" data-settings="ms-settings:bluetooth">
+              <span class="ti"></span><span class="tl"><b>Bluetooth</b><small></small></span>
+            </button>
+            <button class="cc-tile" data-cc="mute" data-settings="ms-settings:sound">
+              <span class="ti"></span><span class="tl"><b>Sound</b><small></small></span>
+            </button>
+          </div>
+          <label class="cc-slider" data-cc="brightness" data-settings="ms-settings:display">
+            <span class="si"></span>
+            <input type="range" min="0" max="100" step="1" />
+            <span class="sv"></span>
+          </label>
+          <label class="cc-slider" data-cc="volume" data-settings="ms-settings:sound">
+            <button class="si icon-btn" data-cc-mute title="Mute / unmute"></button>
+            <input type="range" min="0" max="100" step="1" />
+            <span class="sv"></span>
+          </label>
+          <div class="cc-modes">
+            <button data-mode="normal" title="Normal: everything back on"></button>
+            <button data-mode="airplane" data-settings="ms-settings:network-airplanemode" title="Airplane mode: turns off all radios"></button>
+            <button data-mode="lowPower" data-settings="ms-settings:powersleep" title="Low power: best power efficiency"></button>
+            <button data-mode="dnd" data-settings="ms-settings:notifications" title="Do not disturb: silences notifications"></button>
+          </div>
+        </div>
+
         <div class="x-actions"></div>
       </section>
     </div>

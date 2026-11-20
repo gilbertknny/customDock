@@ -30,6 +30,8 @@
   "island": {
     "enabled": true,
     "style": "glass",
+    "idleScale": 0.7,
+    "proximity": 240,
     "clock24h": true,
     "showSeconds": false,
     "expandOnHover": true,

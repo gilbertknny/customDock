@@ -7,10 +7,11 @@
   top: 8px;
   left: 50%;
   transform: translateX(-50%);
-  width: 210px;
-  height: 36px;
+  --k: 1; /* compact scale: < 1 when idle, grows as the cursor approaches */
+  width: calc(210px * var(--k));
+  height: calc(36px * var(--k));
   border-radius: var(--radius);
-  --radius: 18px;
+  --radius: calc(18px * var(--k));
   transition:
     width 0.55s var(--spring),
     height 0.55s var(--spring),
@@ -18,14 +19,18 @@
     box-shadow 0.4s;
   cursor: default;
 }
+#island.s-compact.tracking {
+  transition-duration: 0.16s, 0.16s, 0.16s, 0.4s;
+  transition-timing-function: ease-out;
+}
 #island.s-activity {
   width: 340px;
   height: 50px;
   --radius: 25px;
 }
 #island.s-expanded {
-  width: 448px;
-  height: 252px;
+  width: 460px;
+  height: var(--xh, 470px);
   --radius: 34px;
 }
 #island.black {
@@ -57,7 +62,19 @@
   transition: opacity 0.25s, filter 0.3s, transform 0.45s var(--spring);
   pointer-events: none;
 }
-.s-compact .compact,
+.s-compact .compact {
+  opacity: 1;
+  filter: none;
+  transform: translateX(-50%) scale(var(--k));
+  pointer-events: auto;
+  transition-delay: 0.08s;
+}
+.compact {
+  transform-origin: 50% 0;
+}
+.s-compact.tracking .compact {
+  transition: opacity 0.25s, filter 0.3s, transform 0.16s ease-out;
+}
 .s-activity .activity,
 .s-expanded .expanded {
   opacity: 1;
@@ -229,12 +246,11 @@
 
 /* ---------- expanded ---------- */
 .expanded {
-  width: 448px;
-  height: 252px;
-  padding: 18px 20px 16px;
+  width: 460px;
+  padding: 18px 18px 16px;
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 12px;
 }
 .x-top {
   display: flex;
@@ -456,3 +472,191 @@
   color: var(--warn);
   box-shadow: inset 0 0 0 1px var(--warn);
 }
+
+/* ---------- control center ---------- */
+.x-cc {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.cc-tiles {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+.cc-tile {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 46px;
+  padding: 0 10px 0 7px;
+  border: 0;
+  border-radius: 15px;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  background: var(--fg-faint);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08);
+  transition: background 0.2s, transform 0.15s, opacity 0.2s;
+}
+.cc-tile:active {
+  transform: scale(0.96);
+}
+.cc-tile .ti {
+  flex: none;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: var(--fg-faint);
+  transition: background 0.2s, color 0.2s;
+}
+.cc-tile .ti svg {
+  width: 17px;
+  height: 17px;
+}
+.cc-tile .tl {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  line-height: 1.15;
+}
+.cc-tile b {
+  font-size: 12px;
+  font-weight: 650;
+}
+.cc-tile small {
+  font-size: 10.5px;
+  color: var(--fg-dim);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.cc-tile.on .ti {
+  background: linear-gradient(135deg, var(--accent), #5b7cff);
+  color: #fff;
+  box-shadow: 0 4px 12px -4px var(--accent);
+}
+.cc-tile[data-cc="mute"].on .ti {
+  background: linear-gradient(135deg, #ff6b81, #e8436b);
+  box-shadow: 0 4px 12px -4px #e8436b;
+}
+.cc-tile:disabled,
+.cc-slider.disabled {
+  opacity: 0.4;
+}
+
+.cc-slider {
+  position: relative;
+  display: grid;
+  grid-template-columns: 30px 1fr 38px;
+  align-items: center;
+  gap: 6px;
+  height: 34px;
+  padding: 0 8px 0 4px;
+  border-radius: 13px;
+  background: var(--fg-faint);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08);
+}
+.cc-slider .si {
+  width: 28px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+  color: var(--fg);
+}
+.cc-slider .si svg {
+  width: 17px;
+  height: 17px;
+}
+.cc-slider .sv {
+  font-size: 11px;
+  font-weight: 650;
+  text-align: right;
+  color: var(--fg-dim);
+  font-variant-numeric: tabular-nums;
+}
+.cc-slider input {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 8px;
+  margin: 0;
+  border-radius: 8px;
+  background:
+    linear-gradient(90deg, var(--fill, var(--fg)) calc(var(--p, 0) * 100%), transparent 0),
+    var(--fg-faint);
+  outline: none;
+}
+.cc-slider[data-cc="brightness"] input {
+  --fill: linear-gradient(90deg, #ffb347, #ffe08a);
+  background:
+    linear-gradient(90deg, #ffb347, #ffd76a) 0 0 / calc(var(--p, 0) * 100%) 100% no-repeat,
+    var(--fg-faint);
+}
+.cc-slider.muted input {
+  background:
+    linear-gradient(90deg, var(--fg-dim) calc(var(--p, 0) * 100%), transparent 0),
+    var(--fg-faint);
+}
+.cc-slider input::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.35), inset 0 0 0 0.5px rgba(0, 0, 0, 0.1);
+  transition: transform 0.15s;
+}
+.cc-slider input:active::-webkit-slider-thumb {
+  transform: scale(1.2);
+}
+
+.cc-modes {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 4px;
+  padding: 4px;
+  border-radius: 14px;
+  background: var(--fg-faint);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08);
+}
+.cc-modes button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  height: 30px;
+  border: 0;
+  border-radius: 10px;
+  color: var(--fg-dim);
+  background: transparent;
+  font: 600 11.5px var(--font);
+  transition: background 0.2s, color 0.2s, box-shadow 0.2s;
+}
+.cc-modes button svg {
+  width: 14px;
+  height: 14px;
+}
+.cc-modes button:hover {
+  color: var(--fg);
+}
+.cc-modes button.on {
+  color: var(--fg);
+  background: rgba(255, 255, 255, 0.22);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.25), 0 4px 10px -6px rgba(0, 0, 0, 0.4);
+}
+.theme-light .cc-modes button.on {
+  background: rgba(255, 255, 255, 0.85);
+}
+.cc-modes button[data-mode="airplane"].on,
+.cc-modes button[data-mode="lowPower"].on,
+.cc-modes button[data-mode="dnd"].on {
+  color: #fff;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.25), 0 4px 12px -5px var(--mode-c);
+  background: var(--mode-bg);
+}
+.cc-modes button[data-mode="airplane"] { --mode-bg: linear-gradient(135deg, #ffa24c, #f97316); --mode-c: #f97316; }
+.cc-modes button[data-mode="lowPower"] { --mode-bg: linear-gradient(135deg, #4ade80, #16a34a); --mode-c: #16a34a; }
+.cc-modes button[data-mode="dnd"] { --mode-bg: linear-gradient(135deg, #b98bff, #7c4dff); --mode-c: #7c4dff; }

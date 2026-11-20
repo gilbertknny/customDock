@@ -40,23 +40,33 @@
   </head>
   <body>
     <div id="bar">
-      <button data-a="expand">Expand island</button>
-      <button data-a="collapse">Collapse island</button>
+      <button data-a="expand">Expand notch</button>
+      <button data-a="collapse">Collapse notch</button>
+      <button data-a="notify">New notification</button>
       <button data-a="charge">Charging activity</button>
       <button data-a="theme">Toggle light/dark</button>
-      <button data-a="black">Toggle black island</button>
+      <button data-a="black">Toggle black notch</button>
     </div>
     <script>
       const p = new URLSearchParams(location.search);
       let theme = p.get('theme') || 'dark';
       let style = p.get('style') || 'glass';
+      let ni = 0;
+      function sample() {
+        const s = [
+          { app: 'Messages', title: 'Kevin', body: 'Bro, push repo-nya udah? Mau gue test di laptop kantor 🙏' },
+          { app: 'Calendar', title: 'Stand-up in 5 min', body: 'Daily sync · Google Meet' },
+          { app: 'Mail', title: 'GitHub', body: '[customDock] Build succeeded for v0.2.0' },
+        ][ni++ % 3];
+        return { id: 'p' + Date.now(), appName: s.app, time: Date.now(), ...s };
+      }
       function mount() {
         document.querySelectorAll('iframe').forEach((f) => f.remove());
         const W = innerWidth, H = innerHeight;
         const common = `sw=${W}&sh=${H}&theme=${theme}&style=${style}&wallpaper=../../../assets/demo-wallpaper.jpg`;
         const island = document.createElement('iframe');
-        Object.assign(island.style, { left: `${(W - 620) / 2}px`, top: '0px', width: '620px', height: '500px' });
-        island.src = `../src/renderer/island/index.html?${common}&x=${(W - 620) / 2}&y=0`;
+        Object.assign(island.style, { left: `${(W - 640) / 2}px`, top: '0px', width: '640px', height: '560px' });
+        island.src = `../src/renderer/notch/index.html?${common}&x=${(W - 640) / 2}&y=0`;
         island.id = 'island';
         const dock = document.createElement('iframe');
         Object.assign(dock.style, { left: '0px', top: `${H - 193}px`, width: `${W}px`, height: '193px' });
@@ -65,17 +75,21 @@
         document.body.append(island, dock);
         island.onload = () => {
           const s = p.get('state');
-          const api = () => island.contentWindow.__island;
+          const api = () => island.contentWindow.__notch;
           const wait = (fn) => (api() ? fn(api()) : setTimeout(() => wait(fn), 50));
           if (s === 'expanded') wait((a) => a.setHover(true));
+          if (s === 'notifs') wait((a) => (a.setHover(true), a.selectTab('notifs')));
+          if (s === 'controls') wait((a) => (a.setHover(true), a.selectTab('controls')));
+          if (s === 'toast') wait((a) => a.notify(sample()));
           if (s === 'activity') wait((a) => a.showActivity({ icon: 'bolt', color: '#4ade80', sub: 'Power connected', title: 'Charging', right: '76%' }, 1e9));
         };
       }
       document.getElementById('bar').addEventListener('click', (e) => {
         const a = e.target.dataset.a;
-        const api = document.getElementById('island').contentWindow.__island;
+        const api = document.getElementById('island').contentWindow.__notch;
         if (a === 'expand') api.setHover(true);
         if (a === 'collapse') api.setHover(false);
+        if (a === 'notify') api.notify(sample());
         if (a === 'charge') api.showActivity({ icon: 'bolt', color: '#4ade80', sub: 'Power connected', title: 'Charging', right: '76%', pulse: true });
         if (a === 'theme') (theme = theme === 'dark' ? 'light' : 'dark'), mount();
         if (a === 'black') (style = style === 'black' ? 'glass' : 'black'), mount();

@@ -1,0 +1,151 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; img-src 'self' data: frost: file:; style-src 'self' 'unsafe-inline'; script-src 'self'"
+    />
+    <title>FrostShell Notch</title>
+    <link rel="stylesheet" href="../shared/glass.css" />
+    <link rel="stylesheet" href="notch.css" />
+  </head>
+  <body class="theme-dark">
+    <!-- #notch owns the size/morph; #panel is the glass body incl. the concave "ears" -->
+    <div id="notch" class="s-compact">
+      <div id="panel" class="glass" data-hit>
+        <svg class="rim" aria-hidden="true"><path /></svg>
+
+        <!-- compact -->
+        <section class="view compact">
+          <div class="c-left">
+            <img class="art-sm" alt="" />
+            <span class="dot"></span>
+          </div>
+          <div class="c-time"></div>
+          <div class="c-right">
+            <span class="c-timer"></span>
+            <div class="eq"><i></i><i></i><i></i><i></i></div>
+            <span class="c-batt"></span>
+          </div>
+          <span class="badge" title="Unread notifications"></span>
+        </section>
+
+        <!-- live activity (track change, charging, timer, modes) -->
+        <section class="view activity">
+          <div class="a-icon"></div>
+          <div class="a-text">
+            <span class="a-sub"></span>
+            <b class="a-title"></b>
+          </div>
+          <div class="a-right"></div>
+        </section>
+
+        <!-- incoming notification -->
+        <section class="view toast">
+          <div class="t-icon"><img alt="" /></div>
+          <div class="t-main">
+            <div class="t-head"><span class="t-app"></span><span class="t-time">now</span><span class="t-more"></span></div>
+            <div class="t-title"></div>
+            <div class="t-body"></div>
+            <div class="t-actions">
+              <button class="t-btn primary" data-t="open">Open</button>
+              <button class="t-btn" data-t="dismiss">Dismiss</button>
+            </div>
+          </div>
+          <div class="t-progress"><i></i></div>
+        </section>
+
+        <!-- expanded -->
+        <section class="view expanded">
+          <nav class="tabs">
+            <button data-tab="home" class="on">Home</button>
+            <button data-tab="controls">Controls</button>
+            <button data-tab="notifs">Notifications <span class="tab-count"></span></button>
+            <i class="tab-ink"></i>
+          </nav>
+
+          <div class="page on" data-page="home">
+            <header class="x-top">
+              <div class="x-clock">
+                <div class="x-time"></div>
+                <div class="x-date"></div>
+              </div>
+              <div class="x-stats">
+                <div class="ring" data-k="cpu"><svg viewBox="0 0 36 36"><circle class="track" cx="18" cy="18" r="15" /><circle class="val" cx="18" cy="18" r="15" /></svg><span></span><small>CPU</small></div>
+                <div class="ring" data-k="mem"><svg viewBox="0 0 36 36"><circle class="track" cx="18" cy="18" r="15" /><circle class="val" cx="18" cy="18" r="15" /></svg><span></span><small>RAM</small></div>
+                <div class="ring" data-k="bat"><svg viewBox="0 0 36 36"><circle class="track" cx="18" cy="18" r="15" /><circle class="val" cx="18" cy="18" r="15" /></svg><span></span><small>BAT</small></div>
+              </div>
+            </header>
+
+            <div class="x-media">
+              <div class="art-lg"><img alt="" /></div>
+              <div class="meta">
+                <div class="m-title"></div>
+                <div class="m-artist"></div>
+                <div class="progress"><div class="bar"><i></i></div><span class="t-pos"></span><span class="t-dur"></span></div>
+              </div>
+              <div class="controls">
+                <button class="icon-btn" data-media="prev" title="Previous"></button>
+                <button class="icon-btn big" data-media="toggle" title="Play / Pause"></button>
+                <button class="icon-btn" data-media="next" title="Next"></button>
+              </div>
+            </div>
+
+            <div class="x-latest"></div>
+            <div class="x-actions"></div>
+          </div>
+
+          <div class="page" data-page="controls">
+            <div class="x-cc">
+              <div class="cc-tiles">
+                <button class="cc-tile" data-cc="wifi" data-settings="ms-settings:network-wifi">
+                  <span class="ti"></span><span class="tl"><b>Wi-Fi</b><small></small></span>
+                </button>
+                <button class="cc-tile" data-cc="bluetooth" data-settings="ms-settings:bluetooth">
+                  <span class="ti"></span><span class="tl"><b>Bluetooth</b><small></small></span>
+                </button>
+                <button class="cc-tile" data-cc="mute" data-settings="ms-settings:sound">
+                  <span class="ti"></span><span class="tl"><b>Sound</b><small></small></span>
+                </button>
+              </div>
+              <label class="cc-slider" data-cc="brightness" data-settings="ms-settings:display">
+                <span class="si"></span>
+                <input type="range" min="0" max="100" step="1" />
+                <span class="sv"></span>
+              </label>
+              <label class="cc-slider" data-cc="volume" data-settings="ms-settings:sound">
+                <button class="si icon-btn" data-cc-mute title="Mute / unmute"></button>
+                <input type="range" min="0" max="100" step="1" />
+                <span class="sv"></span>
+              </label>
+              <div class="cc-modes">
+                <button data-mode="normal" title="Normal: everything back on"></button>
+                <button data-mode="airplane" data-settings="ms-settings:network-airplanemode" title="Airplane mode: turns off all radios"></button>
+                <button data-mode="lowPower" data-settings="ms-settings:powersleep" title="Low power: best power efficiency"></button>
+                <button data-mode="dnd" data-settings="ms-settings:notifications" title="Focus: silences notifications"></button>
+              </div>
+            </div>
+          </div>
+
+          <div class="page" data-page="notifs">
+            <div class="n-head">
+              <span class="n-title">Notifications</span>
+              <button class="n-clear">Clear all</button>
+            </div>
+            <div class="n-list"></div>
+            <div class="n-empty">
+              <span class="n-empty-icon"></span>
+              <span>You're all caught up</span>
+            </div>
+          </div>
+        </section>
+      </div>
+    </div>
+
+    <script src="../shared/mock.js"></script>
+    <script src="../shared/icons.js"></script>
+    <script src="../shared/ui.js"></script>
+    <script src="notch.js"></script>
+  </body>
+</html>

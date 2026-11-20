@@ -1,14 +1,15 @@
 {
   "name": "frostshell",
   "version": "0.1.0",
-  "description": "Glassmorphism dock + Dynamic Island for Windows 11",
+  "description": "Glassmorphism dock + notch for Windows 11",
   "main": "src/main.js",
   "author": "FrostShell contributors",
   "license": "MIT",
   "keywords": [
     "windows-11",
     "dock",
-    "dynamic-island",
+    "notch",
+    "notifications",
     "glassmorphism",
     "electron",
     "customization",
@@ -18,7 +19,7 @@
     "start": "electron .",
     "demo": "electron . --demo",
     "dist": "electron-builder --win",
-    "check": "node --check src/main.js && node --check src/preload.js && node --check src/config.js && node --check src/system/media.js && node --check src/system/processes.js && node --check src/system/stats.js && node --check src/system/wallpaper.js && node --check src/system/icons.js && node --check src/system/controls.js"
+    "check": "node --check src/main.js && node --check src/preload.js && node --check src/config.js && node --check src/system/media.js && node --check src/system/processes.js && node --check src/system/stats.js && node --check src/system/wallpaper.js && node --check src/system/icons.js && node --check src/system/controls.js && node --check src/system/notifications.js"
   },
   "devDependencies": {
     "electron": "^45.4.1",

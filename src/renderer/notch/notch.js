@@ -1,7 +1,9 @@
 (async function () {
   const ui = window.FrostUI;
   const $ = (s) => document.querySelector(s);
-  const island = $('#island');
+  const island = $('#notch'); // owns state + size (name kept for brevity)
+  const panel = $('#panel'); // glass body incl. ears
+  const rimPath = $('.rim path');
 
   const init = await frost.init();
   let cfg = init.config;
@@ -14,36 +16,84 @@
   let hoverTimer = null;
   let timer = null; // { end, minutes }
   let battery = null;
+  let state = 'compact';
 
-  ui.glassify(island);
+  ui.glassify(panel);
   ui.boot(init, {
     onConfig: (p) => {
       cfg = p.config;
       applyStyle();
       renderActions();
+      renderList();
       tick();
     },
   });
 
+  // ---------- notch outline (square top, concave ears, rounded bottom) ----------
+  let lastShape = '';
+  function drawShape() {
+    const W = panel.offsetWidth;
+    const H = panel.offsetHeight;
+    if (!W || !H) return;
+    const cs = getComputedStyle(island);
+    const e = parseFloat(cs.getPropertyValue('--ear')) || 0;
+    const r = Math.max(0, Math.min(parseFloat(cs.getPropertyValue('--r')) || 0, H - e, (W - 2 * e) / 2));
+    const f = (n) => Math.round(n * 10) / 10;
+    const outline =
+      `M${f(W)} 0A${f(e)} ${f(e)} 0 0 0 ${f(W - e)} ${f(e)}V${f(H - r)}` +
+      `A${f(r)} ${f(r)} 0 0 1 ${f(W - e - r)} ${f(H)}H${f(e + r)}` +
+      `A${f(r)} ${f(r)} 0 0 1 ${f(e)} ${f(H - r)}V${f(e)}A${f(e)} ${f(e)} 0 0 0 0 0`;
+    if (outline === lastShape) return;
+    lastShape = outline;
+    rimPath.setAttribute('d', outline); // open path: no rim line along the screen edge
+    rimPath.parentNode.setAttribute('viewBox', `0 0 ${W} ${H}`);
+    const svg = `<svg xmlns='http://www.w3.org/2000/svg' width='${W}' height='${H}' viewBox='0 0 ${W} ${H}'><path d='M0 0H${f(W)}${outline.slice(outline.indexOf('A'))}Z'/></svg>`;
+    panel.style.setProperty('--shape', `url("data:image/svg+xml,${encodeURIComponent(svg)}")`);
+  }
+  new ResizeObserver(drawShape).observe(panel);
+  let shapeRuns = 0;
+  let shapeRaf = 0;
+  const shapeLoop = () => {
+    drawShape();
+    shapeRaf = shapeRuns > 0 ? requestAnimationFrame(shapeLoop) : 0;
+  };
+  island.addEventListener('transitionrun', (e) => {
+    if (e.target !== island) return;
+    shapeRuns++;
+    if (!shapeRaf) shapeRaf = requestAnimationFrame(shapeLoop);
+  });
+  const shapeDone = (e) => {
+    if (e.target !== island) return;
+    shapeRuns = Math.max(0, shapeRuns - 1);
+    drawShape();
+  };
+  island.addEventListener('transitionend', shapeDone);
+  island.addEventListener('transitioncancel', shapeDone);
+
   // ---------- state machine ----------
   function setState() {
-    const expand = (hover && cfg.island.expandOnHover) || pinned;
-    const s = expand ? 'expanded' : activity ? 'activity' : 'compact';
-    island.classList.remove('s-compact', 's-activity', 's-expanded');
+    const expand = (hover && cfg.notch.expandOnHover) || pinned;
+    const s = notif.current ? 'toast' : expand ? 'expanded' : activity ? 'activity' : 'compact';
+    const entering = s !== state;
+    state = s;
+    island.classList.remove('s-compact', 's-activity', 's-toast', 's-expanded');
     island.classList.add(`s-${s}`);
     if (s !== 'compact') setK(1, false);
     else setK(restK(), false);
-    if (s === 'expanded') startCcPolling();
-    else stopCcPolling();
+    if (s === 'expanded') {
+      startCcPolling();
+      if (entering) selectTab(notif.unread.size ? 'notifs' : currentTab === 'notifs' ? 'home' : currentTab);
+    } else stopCcPolling();
     ui.kick();
+    drawShape();
   }
 
   // ---------- idle size + proximity growth ----------
-  // At rest the pill shrinks to island.idleScale; it grows smoothly as the cursor
-  // approaches (within island.proximity px), then expands fully on hover.
+  // At rest the notch shrinks to notch.idleScale; it grows smoothly as the cursor
+  // approaches (within notch.proximity px), then expands fully on hover.
   let k = 1;
   let trackTimer = null;
-  const idleScale = () => Math.max(0.4, Math.min(1, cfg.island.idleScale ?? 0.7));
+  const idleScale = () => Math.max(0.4, Math.min(1, cfg.notch.idleScale ?? 0.75));
   const restK = () => idleScale();
 
   function setK(next, tracking) {
@@ -57,32 +107,32 @@
   }
 
   document.addEventListener('mousemove', (e) => {
-    if (!island.classList.contains('s-compact')) return;
+    if (state !== 'compact') return;
     const idle = idleScale();
     if (idle >= 1) return;
-    const range = cfg.island.proximity ?? 240;
-    // distance to the full-size pill (fixed geometry, so no feedback loop)
-    const w = 210, h = 36, top = 8;
+    const range = cfg.notch.proximity ?? 240;
+    // distance to the full-size notch (fixed geometry, so no feedback loop)
+    const w = 200, h = 32;
     const left = innerWidth / 2 - w / 2;
     const dx = Math.max(left - e.clientX, 0, e.clientX - (left + w));
-    const dy = Math.max(top - e.clientY, 0, e.clientY - (top + h));
+    const dy = Math.max(0, e.clientY - h);
     const t = Math.max(0, 1 - Math.hypot(dx, dy) / range);
     const ease = t * t * (3 - 2 * t);
     setK(idle + (1 - idle) * ease, true);
   });
   document.addEventListener('mouseleave', () => {
-    if (island.classList.contains('s-compact')) setK(restK(), true);
+    if (state === 'compact') setK(restK(), true);
   });
 
   function applyStyle() {
-    island.classList.toggle('black', cfg.island.style === 'black');
+    panel.classList.toggle('black', cfg.notch.style === 'black');
   }
 
-  function showActivity(a, duration = cfg.island.activityDuration || 3500) {
+  function showActivity(a, duration = cfg.notch.activityDuration || 3500) {
     activity = a;
     const icon = $('.a-icon');
     island.style.setProperty('--icon-color', a.color || '');
-    island.style.setProperty('--pulse', a.color ? `${a.color}aa` : '');
+    island.style.setProperty('--pulse', a.color ? `${a.color}cc` : '');
     if (a.art) {
       const img = new Image();
       img.src = a.art;
@@ -95,28 +145,31 @@
     const right = $('.a-right');
     if (a.right === 'eq') right.innerHTML = '<div class="eq"><i></i><i></i><i></i><i></i></div>';
     else right.textContent = a.right || '';
-    if (a.pulse) {
-      island.classList.remove('pulse');
-      void island.offsetWidth;
-      island.classList.add('pulse');
-    }
+    if (a.pulse) pulse(a.color);
     setState();
     clearTimeout(activityTimer);
     activityTimer = setTimeout(() => {
       activity = null;
-      island.classList.remove('pulse');
       setState();
     }, duration);
   }
 
-  island.addEventListener('mouseenter', () => {
+  function pulse(color) {
+    island.style.setProperty('--pulse', color ? `${color}cc` : '');
+    island.classList.remove('pulse');
+    void island.offsetWidth;
+    island.classList.add('pulse');
+    setTimeout(() => island.classList.remove('pulse'), 2300);
+  }
+
+  panel.addEventListener('mouseenter', () => {
     clearTimeout(hoverTimer);
     hoverTimer = setTimeout(() => {
       hover = true;
       setState();
     }, 90);
   });
-  island.addEventListener('mouseleave', () => {
+  panel.addEventListener('mouseleave', () => {
     clearTimeout(hoverTimer);
     hoverTimer = setTimeout(() => {
       hover = false;
@@ -124,13 +177,25 @@
       setState();
     }, 320);
   });
-  island.addEventListener('click', (e) => {
-    if (e.target.closest('button')) return;
-    if (!cfg.island.expandOnHover) {
+  panel.addEventListener('click', (e) => {
+    if (e.target.closest('button, .n-item, .toast')) return;
+    if (!cfg.notch.expandOnHover) {
       pinned = !pinned;
       setState();
     }
   });
+
+  // ---------- tabs ----------
+  const TABS = ['home', 'controls', 'notifs'];
+  let currentTab = 'home';
+  function selectTab(name) {
+    currentTab = name;
+    document.querySelectorAll('.tabs button').forEach((b) => b.classList.toggle('on', b.dataset.tab === name));
+    document.querySelectorAll('.page').forEach((p) => p.classList.toggle('on', p.dataset.page === name));
+    $('.tabs').style.setProperty('--tab', TABS.indexOf(name));
+    if (name === 'notifs') setTimeout(() => currentTab === 'notifs' && state === 'expanded' && markAllRead(), 900);
+  }
+  document.querySelectorAll('.tabs button').forEach((b) => b.addEventListener('click', () => selectTab(b.dataset.tab)));
 
   // ---------- clock ----------
   const fmt = (n) => String(n).padStart(2, '0');
@@ -144,12 +209,12 @@
       hour: '2-digit',
       minute: '2-digit',
       second: withSeconds ? '2-digit' : undefined,
-      hour12: !cfg.island.clock24h,
+      hour12: !cfg.notch.clock24h,
     }).format(new Date());
   }
 
   function tick() {
-    $('.c-time').textContent = timeString(cfg.island.showSeconds);
+    $('.c-time').textContent = timeString(cfg.notch.showSeconds);
     $('.x-time').textContent = timeString(false);
     $('.x-date').textContent = new Intl.DateTimeFormat(undefined, {
       weekday: 'long',
@@ -280,7 +345,7 @@
   function renderActions() {
     const box = $('.x-actions');
     box.replaceChildren();
-    for (const a of cfg.island.quickActions || []) {
+    for (const a of cfg.notch.quickActions || []) {
       const b = document.createElement('button');
       b.className = 'chip';
       b.innerHTML = `${Icons.glyph(a.icon)}<span></span>`;
@@ -533,15 +598,253 @@
   new ResizeObserver(measure).observe(expandedView);
   measure();
 
+  // ---------- notifications ----------
+  // UX: a new notification morphs the notch into a toast (icon, app, title, 2-line body)
+  // with a draining progress bar. Hover pauses it and reveals Open / Dismiss. Several at
+  // once queue up ("+2"). Unseen ones leave a red badge on the compact notch; hovering
+  // then opens straight on the Notifications tab. Focus mode = badge only, no pop-up.
+  const notif = { list: [], unread: new Set(), queue: [], current: null, timer: null, remaining: 0, started: 0 };
+  const appIcons = new Map();
+  const toastEl = $('.toast');
+
+  function iconUrl(app) {
+    if (!appIcons.has(app)) appIcons.set(app, frost.icon({ path: `shell:AppsFolder\\${app}` }).catch(() => null));
+    return appIcons.get(app);
+  }
+
+  function fillIcon(box, n) {
+    const img = box.querySelector('img') || box.appendChild(new Image());
+    img.className = '';
+    img.removeAttribute('src');
+    box.querySelectorAll('svg').forEach((s) => s.remove());
+    if (n.image) {
+      img.className = 'avatar';
+      img.src = n.image;
+      return;
+    }
+    img.style.display = 'none';
+    box.insertAdjacentHTML('beforeend', Icons.glyph('bell'));
+    iconUrl(n.app).then((url) => {
+      if (!url) return;
+      box.querySelectorAll('svg').forEach((s) => s.remove());
+      img.style.display = '';
+      img.src = url;
+    });
+  }
+
+  function ago(t) {
+    const s = Math.max(0, (Date.now() - t) / 1000);
+    if (s < 60) return 'now';
+    if (s < 3600) return `${Math.floor(s / 60)}m`;
+    if (s < 86400) return `${Math.floor(s / 3600)}h`;
+    return new Intl.DateTimeFormat(undefined, { day: 'numeric', month: 'short' }).format(t);
+  }
+
+  function dayLabel(t) {
+    const d = new Date(t);
+    const today = new Date();
+    const y = new Date(Date.now() - 86400000);
+    if (d.toDateString() === today.toDateString()) return 'Today';
+    if (d.toDateString() === y.toDateString()) return 'Yesterday';
+    return new Intl.DateTimeFormat(undefined, { weekday: 'long', day: 'numeric', month: 'short' }).format(d);
+  }
+
+  function itemEl(n) {
+    const el = document.createElement('div');
+    el.className = 'n-item' + (notif.unread.has(n.id) ? ' unread' : '');
+    el.innerHTML = `<div class="t-icon"></div><div class="t-main"><div class="t-head"><span class="t-app"></span><span class="t-time"></span></div><div class="t-title"></div><div class="t-body"></div></div><button class="n-x" title="Dismiss">${Icons.glyph('close')}</button>`;
+    fillIcon(el.querySelector('.t-icon'), n);
+    el.querySelector('.t-app').textContent = n.appName || n.app;
+    el.querySelector('.t-time').textContent = ago(n.time);
+    el.querySelector('.t-title').textContent = n.title;
+    el.querySelector('.t-body').textContent = n.body;
+    el.addEventListener('click', (e) => {
+      if (e.target.closest('.n-x')) {
+        el.classList.add('leaving');
+        setTimeout(() => dismiss(n.id), 220);
+        return;
+      }
+      openNotif(n);
+    });
+    return el;
+  }
+
+  function renderList() {
+    const max = cfg.notch.notifications?.max ?? 50;
+    const items = notif.list.slice(0, max);
+    const box = $('.n-list');
+    box.replaceChildren();
+    let day = '';
+    for (const n of items) {
+      const label = dayLabel(n.time);
+      if (label !== day) {
+        day = label;
+        const h = document.createElement('div');
+        h.className = 'n-day';
+        h.textContent = label;
+        box.append(h);
+      }
+      box.append(itemEl(n));
+    }
+    island.classList.toggle('no-notifs', !items.length);
+    // newest one on the Home page, if it's recent
+    const latest = $('.x-latest');
+    latest.replaceChildren();
+    if (items[0] && Date.now() - items[0].time < 6 * 3600e3) {
+      const el = itemEl(items[0]);
+      el.querySelector('.n-x').remove();
+      el.onclick = null;
+      el.addEventListener('click', (e) => {
+        e.stopImmediatePropagation();
+        selectTab('notifs');
+      }, true);
+      latest.append(el);
+    }
+    updateBadge();
+  }
+
+  function updateBadge() {
+    const n = notif.unread.size;
+    island.classList.toggle('has-unread', n > 0);
+    $('.badge').textContent = n > 9 ? '9+' : n;
+    const tc = $('.tab-count');
+    tc.textContent = n > 9 ? '9+' : n;
+    tc.classList.toggle('on', n > 0);
+  }
+
+  function markAllRead() {
+    if (!notif.unread.size) return;
+    notif.unread.clear();
+    document.querySelectorAll('.n-item.unread').forEach((el) => el.classList.remove('unread'));
+    updateBadge();
+  }
+
+  function popupsAllowed() {
+    const n = cfg.notch.notifications || {};
+    return n.enabled !== false && n.popup !== false && !(cc.state && cc.state.dnd);
+  }
+
+  function nextToast() {
+    const n = notif.queue.shift();
+    notif.current = n || null;
+    if (!n) return setState();
+    fillIcon($('.toast .t-icon'), n);
+    $('.toast .t-app').textContent = n.appName || n.app;
+    $('.toast .t-time').textContent = 'now';
+    $('.toast .t-title').textContent = n.title;
+    $('.toast .t-body').textContent = n.body;
+    const more = $('.t-more');
+    more.textContent = `+${notif.queue.length}`;
+    more.classList.toggle('on', notif.queue.length > 0);
+    toastEl.classList.remove('hover');
+    const base = cfg.notch.notifications?.duration ?? 6000;
+    notif.remaining = notif.queue.length ? Math.min(base, 4000) : base;
+    const bar = $('.t-progress i');
+    bar.classList.remove('run');
+    void bar.offsetWidth;
+    bar.style.setProperty('--dur', `${notif.remaining}ms`);
+    bar.classList.add('run');
+    island.style.setProperty('--th', `${toastEl.offsetHeight}px`);
+    pulse('#7aa7ff');
+    setState();
+    runToastTimer();
+  }
+
+  function runToastTimer() {
+    clearTimeout(notif.timer);
+    notif.started = Date.now();
+    notif.timer = setTimeout(endToast, notif.remaining);
+  }
+
+  function endToast() {
+    clearTimeout(notif.timer);
+    notif.current = null;
+    nextToast();
+  }
+
+  toastEl.addEventListener('mouseenter', () => {
+    if (!notif.current) return;
+    clearTimeout(notif.timer);
+    notif.remaining -= Date.now() - notif.started;
+    toastEl.classList.add('hover');
+    requestAnimationFrame(() => island.style.setProperty('--th', `${toastEl.scrollHeight}px`));
+  });
+  toastEl.addEventListener('mouseleave', () => {
+    if (!notif.current) return;
+    toastEl.classList.remove('hover');
+    notif.remaining = Math.max(notif.remaining, 1500);
+    island.style.setProperty('--th', `${toastEl.offsetHeight}px`);
+    runToastTimer();
+  });
+  new ResizeObserver(() => {
+    if (state === 'toast') island.style.setProperty('--th', `${toastEl.offsetHeight}px`);
+  }).observe(toastEl);
+  toastEl.addEventListener('click', (e) => {
+    const n = notif.current;
+    if (!n) return;
+    if (e.target.closest('[data-t="dismiss"]')) dismiss(n.id);
+    else openNotif(n);
+    endToast();
+  });
+
+  function openNotif(n) {
+    notif.unread.delete(n.id);
+    frost.notifOpen(n);
+    updateBadge();
+  }
+
+  function dismiss(id) {
+    notif.unread.delete(id);
+    notif.list = notif.list.filter((n) => n.id !== id);
+    frost.notifDismiss([id]);
+    renderList();
+  }
+
+  $('.n-clear').addEventListener('click', () => {
+    const ids = notif.list.map((n) => n.id);
+    document.querySelectorAll('.n-list .n-item').forEach((el, i) => setTimeout(() => el.classList.add('leaving'), i * 30));
+    setTimeout(() => {
+      notif.unread.clear();
+      notif.list = [];
+      frost.notifDismiss(ids);
+      renderList();
+    }, 260);
+  });
+  $('.n-empty-icon').innerHTML = Icons.glyph('bell');
+
+  function onNotifications(p) {
+    if (!p) return;
+    notif.list = p.list || [];
+    for (const n of p.fresh || []) {
+      notif.unread.add(n.id);
+      if (popupsAllowed()) notif.queue.push(n);
+    }
+    renderList();
+    if (notif.queue.length && !notif.current) nextToast();
+    else if (notif.current) {
+      const more = $('.t-more');
+      more.textContent = `+${notif.queue.length}`;
+      more.classList.toggle('on', notif.queue.length > 0);
+    }
+  }
+  frost.on('notifications', onNotifications);
+  setInterval(() => state !== 'expanded' && renderList(), 60000); // refresh relative times
+
   // ---------- boot ----------
   applyStyle();
   renderActions();
   renderMedia(undefined);
   lastKey = media.active ? media.key : null;
   setK(restK(), false);
+  onNotifications({ list: init.notifications || [], fresh: [] });
   setState();
   setInterval(tick, 1000);
 
   // preview hooks (used by docs/preview.html & screenshots)
-  window.__island = { showActivity, setHover: (v) => ((pinned = v), setState()) };
+  window.__notch = {
+    showActivity,
+    setHover: (v) => ((pinned = v), setState()),
+    selectTab,
+    notify: (n) => onNotifications({ list: [n, ...notif.list], fresh: [n] }),
+  };
 })();

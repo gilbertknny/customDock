@@ -1,4 +1,4 @@
-// FrostShell — glassmorphism dock + Dynamic Island for Windows 11.
+// FrostShell — glassmorphism dock + notch for Windows 11.
 const path = require('path');
 const { spawn } = require('child_process');
 const {
@@ -22,6 +22,7 @@ const stats = require('./system/stats');
 const wallpaper = require('./system/wallpaper');
 const icons = require('./system/icons');
 const controls = require('./system/controls');
+const notifications = require('./system/notifications');
 
 const DEMO = process.argv.includes('--demo');
 const ASSETS = path.join(__dirname, '..', 'assets');
@@ -39,7 +40,7 @@ app.setAppUserModelId('dev.frostshell.app');
 // Keep animating even when Windows thinks our transparent windows are occluded.
 app.commandLine.appendSwitch('disable-features', 'CalculateNativeWinOcclusion');
 
-const windows = { dock: null, island: null };
+const windows = { dock: null, notch: null };
 let tray = null;
 
 // ---------- helpers ----------
@@ -130,10 +131,10 @@ function dockBounds(cfg) {
   return { x: d.bounds.x, y: area.y + area.height - height, width: d.bounds.width, height };
 }
 
-function islandBounds() {
+function notchBounds() {
   const d = primary();
-  const width = 620;
-  const height = 500;
+  const width = 640;
+  const height = 560;
   return { x: Math.round(d.bounds.x + (d.bounds.width - width) / 2), y: d.bounds.y, width, height };
 }
 
@@ -149,9 +150,9 @@ function createWindow(kind, bounds) {
 }
 
 function applyConfig(cfg) {
-  const want = { dock: cfg.dock.enabled, island: cfg.island.enabled };
-  const bounds = { dock: () => dockBounds(cfg), island: () => islandBounds() };
-  for (const kind of ['dock', 'island']) {
+  const want = { dock: cfg.dock.enabled, notch: cfg.notch.enabled };
+  const bounds = { dock: () => dockBounds(cfg), notch: () => notchBounds() };
+  for (const kind of ['dock', 'notch']) {
     const w = windows[kind];
     if (want[kind] && !w) windows[kind] = createWindow(kind, bounds[kind]());
     else if (!want[kind] && w) w.destroy();
@@ -227,6 +228,7 @@ ipcMain.handle('init', (e) => {
     media: media.state,
     stats: stats.last || { cpu: 0, mem: 0 },
     running: processes.list(),
+    notifications: notifications.visible(),
   };
 });
 
@@ -239,6 +241,11 @@ ipcMain.on('launch', (_e, index) => launch(config.get().dock.items[index]));
 ipcMain.handle('icon', (_e, item) => icons.iconFor(item || {}));
 ipcMain.on('media', (_e, cmd) => media.command(cmd));
 ipcMain.handle('controls', (_e, req) => controls.run(req));
+ipcMain.on('notif-open', (_e, n) => {
+  // bring up the app that sent it (Windows doesn't expose the toast's own activation)
+  if (n && n.app && !DEMO) runDetached('explorer.exe', [`shell:AppsFolder\\${n.app}`]);
+});
+ipcMain.on('notif-dismiss', (_e, ids) => notifications.dismiss(ids || []));
 ipcMain.on('dock-add', (_e, paths) => addPaths(Array.isArray(paths) ? paths : []));
 
 ipcMain.on('dock-reorder', (_e, from, to) => {
@@ -305,15 +312,15 @@ function rebuildTray() {
       { label: 'FrostShell', enabled: false },
       { type: 'separator' },
       { label: 'Dock', type: 'checkbox', checked: cfg.dock.enabled, click: set((c) => (c.dock.enabled = !c.dock.enabled)) },
-      { label: 'Dynamic Island', type: 'checkbox', checked: cfg.island.enabled, click: set((c) => (c.island.enabled = !c.island.enabled)) },
+      { label: 'Notch', type: 'checkbox', checked: cfg.notch.enabled, click: set((c) => (c.notch.enabled = !c.notch.enabled)) },
       { label: 'Auto-hide dock', type: 'checkbox', checked: cfg.dock.autoHide, click: set((c) => (c.dock.autoHide = !c.dock.autoHide)) },
       { label: 'Add app to dock…', click: addAppDialog },
       { type: 'separator' },
       {
-        label: 'Island style',
+        label: 'Notch style',
         submenu: [
-          radio('Glass', cfg.island.style === 'glass', (c) => (c.island.style = 'glass')),
-          radio('Black (iPhone)', cfg.island.style === 'black', (c) => (c.island.style = 'black')),
+          radio('Glass', cfg.notch.style === 'glass', (c) => (c.notch.style = 'glass')),
+          radio('Black', cfg.notch.style === 'black', (c) => (c.notch.style = 'black')),
         ],
       },
       {
@@ -365,10 +372,12 @@ app.whenReady().then(() => {
   wallpaper.start({ demo: DEMO });
   media.start({ demo: DEMO });
   controls.start({ demo: DEMO });
+  notifications.start({ demo: DEMO });
   processes.start();
   stats.start();
 
   media.on('update', (s) => broadcast('media', s));
+  notifications.on('update', (p) => broadcast('notifications', p));
   processes.on('update', (list) => broadcast('running', list));
   stats.on('update', (s) => broadcast('stats', s));
   wallpaper.on('update', (url) => broadcast('wallpaper', url));
@@ -395,6 +404,7 @@ app.on('window-all-closed', (e) => e.preventDefault()); // keep running in tray
 app.on('will-quit', () => {
   media.stop();
   controls.stop();
+  notifications.stop();
   processes.stop();
   stats.stop();
   wallpaper.stop();

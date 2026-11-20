@@ -4,15 +4,15 @@
 
 # FrostShell
 
-**A glassmorphism dock + Dynamic Island for Windows 11.**
+**A glassmorphism dock + notch for Windows 11.**
 
-macOS-style magnifying dock and an iPhone-style Dynamic Island with media controls, live activities, and system stats, all in frosted glass.
+A macOS-style magnifying dock and a MacBook-style notch with notifications, quick settings, media controls, and live activities, all in frosted glass.
 
 ![Windows 11](https://img.shields.io/badge/Windows-11-0078D4?logo=windows11&logoColor=white)
 ![Electron](https://img.shields.io/badge/Electron-45-47848F?logo=electron&logoColor=white)
 ![License](https://img.shields.io/badge/license-MIT-green)
 
-<img src="docs/expanded.png" alt="FrostShell expanded island and dock" width="900" />
+<img src="docs/expanded.png" alt="FrostShell expanded notch and dock" width="900" />
 
 </div>
 
@@ -20,22 +20,27 @@ macOS-style magnifying dock and an iPhone-style Dynamic Island with media contro
 
 ## ✨ Features
 
-### 🏝️ Dynamic Island
-- **Shrinks when idle, grows as your cursor approaches** (proximity magnification, like the dock), then expands on hover
-- **Compact pill** with the clock, a spinning album-art disc, and an equalizer while music plays
-- **Hover to expand**: big clock + date, CPU/RAM/battery rings, a now-playing card, **control center**, and quick actions
-- **Media controls** for anything that shows up in Windows' media flyout (Spotify, YouTube in Chrome/Edge, Apple Music, VLC, Media Player…), via the native SMTC API
-- **Control center** inside the island:
-  - ☀️ brightness slider · 🔊 volume slider (scroll wheel works too) · 🔇 mute / unmute
-  - 📶 Wi-Fi toggle (shows the connected network) · 🦷 Bluetooth toggle
-  - Modes: **Normal**, **Airplane**, **Low power**, **Focus / Do not disturb**
-  - Right-click any control to open its Windows Settings page
-- **Live activities** that morph the island:
-  - 🎵 track changed → "Now playing"
-  - ⚡ charger plugged / unplugged
-  - ⏱️ quick timer with countdown in the pill + chime when done
-- **Spring physics** morphing between compact → activity → expanded
-- Two styles: **Glass** or **Black (iPhone)**
+### 🔳 Notch
+A MacBook-style notch that hangs from the top edge of the screen: square top, rounded bottom, and concave "ears" that flare into the screen edge, in frosted glass or solid black.
+
+- **Shrinks when idle and grows as your cursor approaches** (proximity magnification, like the dock), then expands on hover
+- **Compact notch** shows the clock, a spinning album-art disc, an equalizer while music plays, and a red **unread badge**
+- **Expanded panel** with three tabs:
+  - **Home**: big clock + date, CPU/RAM/battery rings, now-playing card, latest notification, quick actions
+  - **Controls**: ☀️ brightness · 🔊 volume (scroll wheel works) · 🔇 mute · 📶 Wi-Fi · 🦷 Bluetooth · modes **Normal / Airplane / Low power / Focus**. Right-click any control to open its Windows Settings page
+  - **Notifications**: everything in Windows Notification Center, grouped by day, with app icons, *open*, *dismiss* and *clear all*
+- **Media controls** for anything in Windows' media flyout (Spotify, YouTube in Chrome/Edge, Apple Music, VLC…), via the native SMTC API
+- **Live activities** that morph the notch: 🎵 track changed · ⚡ charger plugged/unplugged · ⏱️ timer with countdown + chime · ✈️/🌙 mode changes
+- **Spring physics** between every state; corner and ear radii animate with the size
+
+#### 🔔 How new notifications behave
+1. **It drops down from the notch** as a toast (app icon, app name, title, 2-line preview) with a soft glow and a draining progress bar (6 s).
+2. **Hover to hold it**: the timer pauses and **Open / Dismiss** buttons slide in. Click anywhere on it to open the app.
+3. **Several at once queue up**: a `+2` chip shows what's waiting, and queued ones get a shorter turn so you aren't stuck watching them.
+4. **Missed it?** The notch keeps a red **unread badge**. The next time you hover, the panel opens straight on the **Notifications** tab and marks them read.
+5. **Focus mode on** means no pop-ups, only the badge count, silently.
+
+> Notifications are read from Windows' own notification database (read-only), so you get every app's notifications, including chat avatars. *Dismiss* hides them in FrostShell only. To avoid seeing each one twice, turn off **Show notification banners** for chatty apps in *Settings → System → Notifications*; they still reach Notification Center and FrostShell.
 
 ### 🚀 Dock
 - **macOS-style magnification** with smooth cosine falloff
@@ -54,12 +59,16 @@ Prefer something simpler? Switch to **Tint only** mode from the tray.
 
 <table>
 <tr>
-<td><img src="docs/magnify.png" alt="Dock magnification" /></td>
-<td><img src="docs/activity.png" alt="Charging live activity" /></td>
+<td><img src="docs/toast.png" alt="Incoming notification" /></td>
+<td><img src="docs/toast-hover.png" alt="Hovered notification with actions" /></td>
 </tr>
 <tr>
-<td><img src="docs/light.png" alt="Light theme" /></td>
-<td><img src="docs/black.png" alt="Black iPhone-style island" /></td>
+<td><img src="docs/notifs.png" alt="Notification list" /></td>
+<td><img src="docs/controls.png" alt="Controls tab" /></td>
+</tr>
+<tr>
+<td><img src="docs/magnify.png" alt="Dock magnification" /></td>
+<td><img src="docs/black.png" alt="Black notch" /></td>
 </tr>
 </table>
 
@@ -120,15 +129,21 @@ Everything lives in `%APPDATA%\FrostShell\config.json` (tray → *Edit config…
       { "name": "Recycle Bin", "path": "shell:RecycleBinFolder", "process": false }
     ]
   },
-  "island": {
+  "notch": {
     "enabled": true,
     "style": "glass",              // glass | black
-    "idleScale": 0.7,              // size at rest (1 = never shrink)
+    "idleScale": 0.75,             // size at rest (1 = never shrink)
     "proximity": 240,              // px: cursor distance where growing starts
     "clock24h": true,
     "showSeconds": false,
     "expandOnHover": true,         // false = click to expand
     "activityDuration": 3500,
+    "notifications": {
+      "enabled": true,
+      "popup": true,               // false = badge only, never drop down
+      "duration": 6000,            // ms a toast stays (paused while hovered)
+      "max": 50                    // items kept in the list
+    },
     "quickActions": [
       { "label": "Snip", "icon": "scissors", "uri": "ms-screenclip:" },
       { "label": "Timer 5m", "icon": "timer", "action": "timer", "minutes": 5 },
@@ -177,13 +192,14 @@ src/
 │   ├── media.js         # long-running PowerShell watcher, art cache
 │   ├── icons.ps1/.js    # native Windows icon extraction (exe/dll + Store apps)
 │   ├── controls.ps1/.js # volume, brightness, radios, power mode, focus
+│   ├── notifications.js # mirrors Windows Notification Center (read-only)
 │   ├── wallpaper.js     # finds & watches the current wallpaper
 │   ├── processes.js     # running-app detection (tasklist)
 │   └── stats.js         # CPU / RAM
 └── renderer/
     ├── shared/          # glass.css, ui.js (glass alignment, click-through), icons
     ├── dock/
-    └── island/
+    └── notch/
 ```
 
 - Both surfaces are **transparent, frameless, always-on-top, non-focusable** windows. Empty pixels pass clicks through to the desktop (`setIgnoreMouseEvents` with forwarding); only elements marked `data-hit` catch the mouse.
@@ -196,8 +212,8 @@ src/
 - [ ] Multi-monitor (dock per display)
 - [ ] Left/right dock positions
 - [ ] Hide over fullscreen apps & games
-- [ ] Notification mirroring in the island
-- [ ] Volume / brightness OSD replacement (show hardware-key changes in the island)
+- [ ] Inline reply / toast action buttons
+- [ ] Volume / brightness OSD replacement (show hardware-key changes in the notch)
 - [ ] Wi-Fi network picker
 - [ ] Native acrylic/mica mode (blur real windows, not only the wallpaper)
 - [ ] Settings GUI
@@ -209,9 +225,10 @@ PRs are very welcome!
 
 ## 🇮🇩 Bahasa Indonesia
 
-**FrostShell** itu dock ala macOS + Dynamic Island ala iPhone buat Windows 11, dengan gaya glassmorphism.
+**FrostShell** itu dock ala macOS + notch ala MacBook buat Windows 11, dengan gaya glassmorphism.
 
-- **Island**: mengecil pas diam dan membesar pelan-pelan saat kursor mendekat. Isinya jam, kontrol musik (Spotify/YouTube/dll.), notifikasi charging, timer, CPU/RAM/baterai, plus **control center**: kecerahan, volume, mute, WiFi, Bluetooth, dan mode Normal / Airplane / Low power / Focus (Do Not Disturb). Hover buat expand.
+- **Notch**: nempel di tepi atas layar, mengecil pas diam dan membesar saat kursor mendekat. Hover buat buka panel dengan 3 tab: **Home** (jam, musik, CPU/RAM/baterai), **Controls** (kecerahan, volume, mute, WiFi, Bluetooth, mode Normal / Airplane / Low power / Focus), dan **Notifications** (semua notifikasi Windows).
+- **Notifikasi baru** turun dari notch sebagai toast selama 6 detik. Hover buat nahan dan muncul tombol Open/Dismiss. Kalau kelewat, ada badge merah di notch, dan pas di-hover langsung kebuka di tab Notifications. Kalau mode Focus nyala, cuma badge aja tanpa pop-up.
 - **Dock**: efek magnify, ikon asli bawaan Windows (diseragamkan di atas alas kotak), indikator app yang lagi jalan, drag buat ngatur urutan, auto-hide.
 - **Glass beneran**: wallpaper kamu di-blur di belakang tiap panel, jadi efek kacanya kelihatan nyata, bukan cuma kotak transparan.
 

@@ -27,40 +27,26 @@
     ],
     "iconStyle": "square"
   },
-  "island": {
+  "notch": {
     "enabled": true,
     "style": "glass",
-    "idleScale": 0.7,
+    "idleScale": 0.75,
     "proximity": 240,
     "clock24h": true,
     "showSeconds": false,
     "expandOnHover": true,
     "activityDuration": 3500,
+    "notifications": {
+      "enabled": true,
+      "popup": true,
+      "duration": 6000,
+      "max": 50
+    },
     "quickActions": [
-      {
-        "label": "Snip",
-        "icon": "scissors",
-        "uri": "ms-screenclip:"
-      },
-      {
-        "label": "Timer 5m",
-        "icon": "timer",
-        "action": "timer",
-        "minutes": 5
-      },
-      {
-        "label": "Lock",
-        "icon": "lock",
-        "path": "rundll32.exe",
-        "args": [
-          "user32.dll,LockWorkStation"
-        ]
-      },
-      {
-        "label": "Settings",
-        "icon": "gear",
-        "uri": "ms-settings:"
-      }
+      { "label": "Snip", "icon": "scissors", "uri": "ms-screenclip:" },
+      { "label": "Timer 5m", "icon": "timer", "action": "timer", "minutes": 5 },
+      { "label": "Lock", "icon": "lock", "path": "rundll32.exe", "args": [ "user32.dll,LockWorkStation" ] },
+      { "label": "Settings", "icon": "gear", "uri": "ms-settings:" }
     ]
   }
 }

@@ -1,4 +1,4 @@
-// Line glyphs for the island UI. Dock icons always come from Windows itself.
+// Line glyphs for the notch UI. Dock icons always come from Windows itself.
 (function () {
   const s = (d, extra = '') =>
     `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" ${extra}>${d}</svg>`;
@@ -27,6 +27,8 @@
     leaf: s('<path d="M11 20A7 7 0 0 1 9.8 6.1C15.5 5 17 4.48 19 2c1 2 2 4.18 2 8 0 5.5-4.78 10-10 10z"/><path d="M2 21c0-3 1.85-5.36 5.08-6C9.5 14.52 12 13 13 12"/>'),
     moon: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>',
     sparkle: s('<path d="M12 3l1.9 5.8L20 11l-6.1 2.2L12 19l-1.9-5.8L4 11l6.1-2.2z"/>'),
+    bell: s('<path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9M13.73 21a2 2 0 0 1-3.46 0"/>'),
+    close: s('<path d="M18 6L6 18M6 6l12 12"/>'),
     battery: s('<rect x="2" y="7" width="18" height="10" rx="2.5"/><path d="M22 11v2"/>'),
   };
 

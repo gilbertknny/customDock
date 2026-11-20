@@ -1,7 +1,7 @@
 // Minimal, explicit bridge between renderers and the main process.
 const { contextBridge, ipcRenderer, webUtils } = require('electron');
 
-const CHANNELS = ['config', 'media', 'stats', 'running', 'wallpaper', 'geometry'];
+const CHANNELS = ['config', 'media', 'stats', 'running', 'wallpaper', 'geometry', 'notifications'];
 
 contextBridge.exposeInMainWorld('frost', {
   init: () => ipcRenderer.invoke('init'),
@@ -14,6 +14,8 @@ contextBridge.exposeInMainWorld('frost', {
   icon: (item) => ipcRenderer.invoke('icon', item),
   media: (cmd) => ipcRenderer.send('media', cmd),
   controls: (req) => ipcRenderer.invoke('controls', req),
+  notifOpen: (n) => ipcRenderer.send('notif-open', n),
+  notifDismiss: (ids) => ipcRenderer.send('notif-dismiss', ids),
   action: (a) => ipcRenderer.send('action', a),
   on: (channel, cb) => {
     if (!CHANNELS.includes(channel)) return () => {};

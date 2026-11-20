@@ -84,6 +84,7 @@
           if (s === 'expanded') wait((a) => a.setHover(true));
           if (s === 'notifs') wait((a) => (a.setHover(true), a.selectTab('notifs')));
           if (s === 'controls') wait((a) => (a.setHover(true), a.selectTab('controls')));
+          if (s === 'wifi') wait((a) => (a.setHover(true), a.selectTab('controls'), setTimeout(() => a.openWifi(), 400)));
           if (s === 'toast') wait((a) => a.notify(sample()));
           if (s === 'osd') wait((a) => { a.osd({ kind: 'volume', value: 0.64, muted: false }); setInterval(() => a.osd({ kind: 'volume', value: 0.64, muted: false }), 1200); });
           if (s === 'osd-bri') wait((a) => { a.osd({ kind: 'brightness', value: 0.8 }); setInterval(() => a.osd({ kind: 'brightness', value: 0.8 }), 1200); });

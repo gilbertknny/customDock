@@ -85,7 +85,10 @@
     if (s === 'expanded') {
       startCcPolling();
       if (entering) selectTab(notif.unread.size ? 'notifs' : currentTab === 'notifs' ? 'home' : currentTab);
-    } else stopCcPolling();
+    } else {
+      stopCcPolling();
+      if (typeof closeWifi === 'function') closeWifi();
+    }
     ui.kick();
     drawShape();
   }
@@ -173,6 +176,7 @@
   });
   panel.addEventListener('mouseleave', () => {
     clearTimeout(hoverTimer);
+    if (typeof wifi !== 'undefined' && wifi.typing) return; // typing a Wi-Fi password: stay open
     hoverTimer = setTimeout(() => {
       hover = false;
       pinned = false;
@@ -191,6 +195,7 @@
   const TABS = ['home', 'controls', 'notifs'];
   let currentTab = 'home';
   function selectTab(name) {
+    if (name !== 'controls' && typeof closeWifi === 'function') closeWifi();
     currentTab = name;
     document.querySelectorAll('.tabs button').forEach((b) => b.classList.toggle('on', b.dataset.tab === name));
     document.querySelectorAll('.page').forEach((p) => p.classList.toggle('on', p.dataset.page === name));
@@ -462,6 +467,7 @@
 
   function renderCc(s) {
     cc.state = s;
+    if (typeof wifi !== 'undefined' && wifi.open) renderWifiHead();
     // Wi-Fi
     const wifiSub = s.wifi === null ? (s.ethernet ? 'Ethernet' : 'Unavailable') : s.wifi ? s.ssid || 'Not connected' : 'Off';
     setTile('wifi', s.wifi, wifiSub, s.wifi === false ? 'wifiOff' : s.wifi === null && s.ethernet ? 'ethernet' : 'wifi', s.wifi !== null);
@@ -546,12 +552,240 @@
   document.querySelector('[data-cc-mute]').addEventListener('click', toggleMute);
   document.querySelector('.cc-tile[data-cc="mute"]').addEventListener('click', toggleMute);
 
-  document.querySelector('.cc-tile[data-cc="wifi"]').addEventListener('click', () => {
-    if (!cc.state) return;
-    const on = !cc.state.wifi;
-    optimistic({ wifi: on, ssid: on ? cc.state.ssid : null });
-    ccRun({ cmd: 'setRadio', kind: 'WiFi', on });
+  // ---------- Wi-Fi picker ----------
+  const ctrlPage = document.querySelector('.page[data-page="controls"]');
+  const wifi = { open: false, nets: [], error: null, asking: null, busy: null, errors: {}, scanning: false, typing: false, pw: '' };
+  const wpList = $('.wp-list');
+  $('.wp-back').innerHTML = Icons.glyph('back');
+  $('.wp-refresh').innerHTML = Icons.glyph('refresh');
+
+  function openWifi() {
+    ctrlPage.classList.add('wifi-open');
+    wifi.open = true;
+    wifi.errors = {};
+    renderWifi();
+    loadWifi(false).then(() => loadWifi(true)); // cached list instantly, then a fresh scan
+  }
+  function closeWifi() {
+    if (!wifi.open) return;
+    ctrlPage.classList.remove('wifi-open');
+    wifi.open = false;
+    wifi.asking = null;
+    endTyping();
+  }
+
+  async function loadWifi(scan) {
+    if (!wifi.open) return;
+    if (scan) wifi.scanning = true;
+    renderWifiHead();
+    const res = await ccRun({ cmd: 'wifiList', scan: !!scan });
+    if (scan) wifi.scanning = false;
+    if (res && res.wifi) {
+      wifi.nets = res.wifi.networks || [];
+      wifi.error = res.wifi.error || null;
+    }
+    renderWifi();
+  }
+
+  function startTyping(input) {
+    if (!wifi.typing) {
+      wifi.typing = true;
+      frost.setFocusable(true); // let the keyboard reach the notch
+    }
+    setTimeout(() => input && input.focus(), 60);
+  }
+  function endTyping() {
+    if (!wifi.typing) return;
+    wifi.typing = false;
+    frost.setFocusable(false);
+  }
+  window.addEventListener('blur', () => {
+    // clicked somewhere else while typing: give focus back and fold away
+    if (!wifi.typing) return;
+    endTyping();
+    if (!panel.matches(':hover')) {
+      hover = false;
+      setState();
+    }
   });
+
+  function renderWifiHead() {
+    const on = !!(cc.state && cc.state.wifi);
+    $('.wp-toggle').checked = on;
+    $('.wp-refresh').classList.toggle('spin', wifi.scanning);
+    $('.wp-refresh').disabled = !on;
+    $('.wp-status').textContent = !on ? 'Off' : wifi.scanning ? 'Scanning…' : '';
+  }
+
+  function netSub(n) {
+    if (wifi.busy === n.ssid) return 'Connecting…';
+    if (n.connected) return n.secure ? 'Connected, secured' : 'Connected';
+    if (n.auth === 'enterprise') return 'Work or school sign-in';
+    if (n.saved) return 'Saved';
+    return n.secure ? 'Secured' : 'Open';
+  }
+
+  function renderWifi() {
+    renderWifiHead();
+    if (wifi.typing) return; // never rebuild under the user's fingers
+    const on = !!(cc.state && cc.state.wifi);
+    wpList.replaceChildren();
+    const msg = $('.wp-msg');
+    msg.replaceChildren();
+    if (!on) msg.textContent = 'Wi-Fi is off. Turn it on to see networks.';
+    else if (wifi.error === 'location') {
+      msg.innerHTML = '<div>Windows needs <b>Location</b> access to list nearby networks.</div><button class="wp-btn primary">Open location settings</button>';
+      msg.querySelector('button').onclick = () => frost.openSettings('ms-settings:privacy-location');
+    } else if (wifi.error === 'noadapter') msg.textContent = 'No Wi-Fi adapter found on this PC.';
+    else if (!wifi.nets.length) msg.textContent = wifi.scanning ? 'Looking for networks…' : 'No networks found.';
+    if (!on) return;
+
+    for (const n of wifi.nets) {
+      const el = document.createElement('div');
+      el.className = 'wp-net' + (n.connected ? ' connected' : '') + (wifi.busy === n.ssid ? ' busy' : '') + (wifi.asking === n.ssid ? ' asking' : '');
+      el.innerHTML = `<div class="wp-row"><span class="wp-sig">${Icons.signal(n.signal)}</span><span class="wp-name"><b></b><small></small></span><span class="wp-actions"></span></div>
+        <div class="wp-form"><input type="password" placeholder="Password" maxlength="63" spellcheck="false" autocomplete="off" />
+        <button class="icon-btn wp-eye" title="Show password">${Icons.glyph('eye')}</button><button class="wp-btn primary wp-go">Connect</button><div class="wp-err"></div></div>`;
+      const name = el.querySelector('b');
+      name.textContent = n.ssid;
+      if (n.secure) name.insertAdjacentHTML('beforeend', Icons.glyph('lockSmall'));
+      el.querySelector('small').textContent = netSub(n);
+      const actions = el.querySelector('.wp-actions');
+      const addBtn = (label, fn, primary) => {
+        const b = document.createElement('button');
+        b.className = 'wp-btn' + (primary ? ' primary' : '');
+        b.textContent = label;
+        b.disabled = !!wifi.busy;
+        b.addEventListener('click', (e) => {
+          e.stopPropagation();
+          fn();
+        });
+        actions.append(b);
+      };
+      if (n.connected) addBtn('Disconnect', () => disconnectWifi());
+      else if (n.saved && wifi.asking !== n.ssid) addBtn('Forget', () => forgetWifi(n));
+      if (!n.connected && wifi.asking !== n.ssid && n.auth !== 'enterprise') addBtn('Connect', () => pickNetwork(n), true);
+      if (n.auth === 'enterprise' && !n.connected) addBtn('Settings', () => frost.openSettings('ms-settings:network-wifi'));
+
+      const err = el.querySelector('.wp-err');
+      err.textContent = wifi.errors[n.ssid] || '';
+      if (wifi.errors[n.ssid] && wifi.asking !== n.ssid) {
+        // show the error under the row even without the password form
+        el.classList.add('asking');
+        el.querySelector('input').style.display = 'none';
+        el.querySelector('.wp-eye').style.display = 'none';
+        el.querySelector('.wp-go').style.display = 'none';
+      }
+
+      el.querySelector('.wp-row').addEventListener('click', () => !n.connected && !wifi.busy && pickNetwork(n));
+      const input = el.querySelector('input');
+      input.value = wifi.asking === n.ssid ? wifi.pw : '';
+      input.addEventListener('input', () => (wifi.pw = input.value));
+      input.addEventListener('focus', () => startTyping());
+      input.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') submit();
+        if (e.key === 'Escape') {
+          wifi.asking = null;
+          wifi.pw = '';
+          endTyping();
+          renderWifi();
+        }
+      });
+      el.querySelector('.wp-eye').addEventListener('click', (e) => {
+        e.stopPropagation();
+        const show = input.type === 'password';
+        input.type = show ? 'text' : 'password';
+        e.currentTarget.innerHTML = Icons.glyph(show ? 'eyeOff' : 'eye');
+        input.focus();
+      });
+      const submit = () => {
+        if (n.secure && wifi.pw.length < 8) {
+          err.textContent = 'Wi-Fi passwords are at least 8 characters.';
+          return;
+        }
+        connectWifi(n.ssid, wifi.pw);
+      };
+      el.querySelector('.wp-go').addEventListener('click', (e) => {
+        e.stopPropagation();
+        submit();
+      });
+      wpList.append(el);
+      if (wifi.busy === n.ssid) input.disabled = true;
+      else if (wifi.asking === n.ssid) startTyping(input);
+    }
+  }
+
+  function pickNetwork(n) {
+    endTyping();
+    wifi.errors[n.ssid] = '';
+    if (n.auth === 'enterprise') {
+      wifi.errors[n.ssid] = 'This network needs a work or school sign-in. Use Windows Wi-Fi settings.';
+      return renderWifi();
+    }
+    if (n.saved || !n.secure) return connectWifi(n.ssid, '');
+    wifi.asking = n.ssid;
+    wifi.pw = '';
+    renderWifi();
+  }
+
+  async function connectWifi(ssid, password) {
+    endTyping();
+    wifi.busy = ssid;
+    wifi.errors[ssid] = '';
+    renderWifi();
+    const res = await ccRun({ cmd: 'wifiConnect', ssid, password: password || '' });
+    wifi.busy = null;
+    const result = (res && res.wifi && res.wifi.result) || 'failed';
+    if (res && res.wifi) wifi.nets = res.wifi.networks || wifi.nets;
+    if (result === 'ok') {
+      wifi.asking = null;
+      wifi.pw = '';
+      showActivity({ icon: 'wifi', sub: 'Wi-Fi', title: `Connected to ${ssid}` }, 2000);
+    } else if (result === 'needpassword') {
+      wifi.asking = ssid;
+    } else if (result === 'password') {
+      wifi.asking = ssid;
+      wifi.errors[ssid] = 'Couldn’t connect. Check the password and try again.';
+    } else if (result === 'enterprise') {
+      wifi.errors[ssid] = 'This network needs a work or school sign-in. Use Windows Wi-Fi settings.';
+    } else {
+      wifi.errors[ssid] = 'Couldn’t connect to this network.';
+    }
+    endTyping(); // allow the rebuild; the form refocuses itself if still needed
+    renderWifi();
+  }
+
+  async function disconnectWifi() {
+    const res = await ccRun({ cmd: 'wifiDisconnect' });
+    if (res && res.wifi) wifi.nets = res.wifi.networks || [];
+    renderWifi();
+  }
+
+  async function forgetWifi(n) {
+    const res = await ccRun({ cmd: 'wifiForget', profile: n.profile });
+    if (res && res.wifi) wifi.nets = res.wifi.networks || [];
+    renderWifi();
+  }
+
+  $('.wp-back').addEventListener('click', closeWifi);
+  $('.wp-refresh').addEventListener('click', () => loadWifi(true));
+  $('.wp-more').addEventListener('click', () => frost.openSettings('ms-settings:network-wifi'));
+  $('.wp-toggle').addEventListener('change', async (e) => {
+    const on = e.target.checked;
+    optimistic({ wifi: on, ssid: on ? cc.state && cc.state.ssid : null });
+    if (!on) wifi.nets = [];
+    renderWifi();
+    await ccRun({ cmd: 'setRadio', kind: 'WiFi', on });
+    if (on) setTimeout(() => loadWifi(true), 1500);
+    else renderWifi();
+  });
+
+  // the Wi-Fi tile opens the picker (on/off lives in the picker header)
+  document.querySelector('.cc-tile[data-cc="wifi"]').addEventListener('click', () => {
+    if (!cc.state || cc.state.wifi === null) return;
+    openWifi();
+  });
+
   document.querySelector('.cc-tile[data-cc="bluetooth"]').addEventListener('click', () => {
     if (!cc.state) return;
     const on = !cc.state.bluetooth;
@@ -878,6 +1112,7 @@
     setHover: (v) => ((pinned = v), setState()),
     osd: onOsd,
     selectTab,
+    openWifi: () => openWifi(),
     notify: (n) => onNotifications({ list: [n, ...notif.list], fresh: [n] }),
   };
 })();

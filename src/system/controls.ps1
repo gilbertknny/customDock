@@ -1,5 +1,6 @@
 # FrostShell system controls — persistent line-based JSON RPC over stdin/stdout.
 # in : {"id":1,"cmd":"state"} | setVolume{value 0-1} | setMute{value} | setBrightness{value 0-100}
+#      wifiList{scan} | wifiConnect{ssid,password?} | wifiDisconnect | wifiForget{profile}
 #      setRadio{kind:"WiFi"|"Bluetooth", on} | setAirplane{on} | setLowPower{on} | setDnd{on}
 # out: {"id":1,"ok":true,"state":{...}}   (the full state after every command)
 # The loop ends when stdin closes, so it never outlives FrostShell.
@@ -9,6 +10,7 @@ $ErrorActionPreference = 'SilentlyContinue'
 
 Add-Type -TypeDefinition @"
 using System;
+using System.Collections.Generic;
 using System.Runtime.InteropServices;
 
 [Guid("5CDF2C82-841E-4546-9722-0CF74078229A"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
@@ -49,6 +51,155 @@ public static class FrostAudio {
   public static bool Mute {
     get { bool mute; Marshal.ThrowExceptionForHR(Vol().GetMute(out mute)); return mute; }
     set { Marshal.ThrowExceptionForHR(Vol().SetMute(value, Guid.Empty)); }
+  }
+}
+
+// Native Wi-Fi (wlanapi.dll): locale-independent, no shell quoting of SSIDs/passwords.
+public class FrostWifiNet {
+  public string Ssid; public int Signal; public bool Secure; public string Auth;
+  public bool Connected; public bool Saved; public string Profile;
+}
+
+public static class FrostWifi {
+  [DllImport("wlanapi.dll")] static extern int WlanOpenHandle(uint ver, IntPtr res, out uint negotiated, out IntPtr handle);
+  [DllImport("wlanapi.dll")] static extern int WlanCloseHandle(IntPtr h, IntPtr res);
+  [DllImport("wlanapi.dll")] static extern int WlanEnumInterfaces(IntPtr h, IntPtr res, out IntPtr list);
+  [DllImport("wlanapi.dll")] static extern void WlanFreeMemory(IntPtr p);
+  [DllImport("wlanapi.dll")] static extern int WlanScan(IntPtr h, ref Guid iface, IntPtr ssid, IntPtr ie, IntPtr res);
+  [DllImport("wlanapi.dll")] static extern int WlanGetAvailableNetworkList(IntPtr h, ref Guid iface, uint flags, IntPtr res, out IntPtr list);
+  [DllImport("wlanapi.dll", CharSet = CharSet.Unicode)] static extern int WlanSetProfile(IntPtr h, ref Guid iface, uint flags, string xml, string sec, bool overwrite, IntPtr res, out uint reason);
+  [DllImport("wlanapi.dll", CharSet = CharSet.Unicode)] static extern int WlanDeleteProfile(IntPtr h, ref Guid iface, string name, IntPtr res);
+  [DllImport("wlanapi.dll")] static extern int WlanConnect(IntPtr h, ref Guid iface, ref ConnParams p, IntPtr res);
+  [DllImport("wlanapi.dll")] static extern int WlanDisconnect(IntPtr h, ref Guid iface, IntPtr res);
+
+  [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
+  struct ConnParams {
+    public int mode; [MarshalAs(UnmanagedType.LPWStr)] public string profile;
+    public IntPtr ssid; public IntPtr bssids; public int bssType; public uint flags;
+  }
+
+  public class WifiError : Exception { public int Code; public WifiError(int c) : base("wlan error " + c) { Code = c; } }
+  static void Check(int r) { if (r != 0) throw new WifiError(r); }
+
+  static IntPtr Open() { uint v; IntPtr h; Check(WlanOpenHandle(2, IntPtr.Zero, out v, out h)); return h; }
+
+  static Guid Iface(IntPtr h) {
+    IntPtr list; Check(WlanEnumInterfaces(h, IntPtr.Zero, out list));
+    try {
+      if (Marshal.ReadInt32(list, 0) == 0) throw new WifiError(-1); // no Wi-Fi adapter
+      byte[] g = new byte[16]; Marshal.Copy(new IntPtr(list.ToInt64() + 8), g, 0, 16);
+      return new Guid(g);
+    } finally { WlanFreeMemory(list); }
+  }
+
+  static string AuthKind(int algo) {
+    switch (algo) {
+      case 1: return "open";
+      case 4: case 7: case 9: return "personal";   // WPA-PSK, WPA2-PSK, WPA3-SAE
+      default: return "enterprise";               // 802.1X, OWE, WEP: hand off to Settings
+    }
+  }
+
+  // WLAN_AVAILABLE_NETWORK is 628 bytes; fields read by offset to avoid marshaling quirks
+  static List<FrostWifiNet> Raw(IntPtr h, Guid g, List<int> algos, List<int> ciphers) {
+    IntPtr list; Check(WlanGetAvailableNetworkList(h, ref g, 0, IntPtr.Zero, out list));
+    var byName = new Dictionary<string, FrostWifiNet>();
+    var order = new List<FrostWifiNet>();
+    try {
+      int n = Marshal.ReadInt32(list, 0);
+      for (int i = 0; i < n; i++) {
+        long b = list.ToInt64() + 8 + (long)i * 628;
+        string profile = Marshal.PtrToStringUni(new IntPtr(b));
+        int len = Math.Min(32, Marshal.ReadInt32(new IntPtr(b + 512)));
+        byte[] raw = new byte[len]; Marshal.Copy(new IntPtr(b + 516), raw, 0, len);
+        string ssid = System.Text.Encoding.UTF8.GetString(raw);
+        if (ssid.Length == 0) continue; // hidden network
+        int signal = Marshal.ReadInt32(new IntPtr(b + 604));
+        bool secure = Marshal.ReadInt32(new IntPtr(b + 608)) != 0;
+        int algo = Marshal.ReadInt32(new IntPtr(b + 612));
+        int cipher = Marshal.ReadInt32(new IntPtr(b + 616));
+        int flags = Marshal.ReadInt32(new IntPtr(b + 620));
+        FrostWifiNet net;
+        if (!byName.TryGetValue(ssid, out net)) {
+          net = new FrostWifiNet { Ssid = ssid, Secure = secure, Auth = AuthKind(algo) };
+          byName[ssid] = net; order.Add(net);
+          if (algos != null) { algos.Add(algo); ciphers.Add(cipher); }
+        }
+        net.Signal = Math.Max(net.Signal, signal);
+        if ((flags & 1) != 0) net.Connected = true;
+        if ((flags & 2) != 0 && !string.IsNullOrEmpty(profile)) { net.Saved = true; net.Profile = profile; }
+      }
+    } finally { WlanFreeMemory(list); }
+    return order;
+  }
+
+  public static FrostWifiNet[] List(bool scan) {
+    IntPtr h = Open();
+    try {
+      Guid g = Iface(h);
+      if (scan) { WlanScan(h, ref g, IntPtr.Zero, IntPtr.Zero, IntPtr.Zero); System.Threading.Thread.Sleep(2600); }
+      var nets = Raw(h, g, null, null);
+      nets.Sort((a, b) => a.Connected != b.Connected ? (a.Connected ? -1 : 1) : b.Signal.CompareTo(a.Signal));
+      return nets.ToArray();
+    } finally { WlanCloseHandle(h, IntPtr.Zero); }
+  }
+
+  static string ProfileXml(string ssid, int algo, int cipher, string password) {
+    var hex = BitConverter.ToString(System.Text.Encoding.UTF8.GetBytes(ssid)).Replace("-", "");
+    string esc = System.Security.SecurityElement.Escape(ssid);
+    string auth = algo == 1 ? "open" : algo == 4 ? "WPAPSK" : algo == 9 ? "WPA3SAE" : "WPA2PSK";
+    string enc = algo == 1 ? "none" : cipher == 2 ? "TKIP" : "AES";
+    string key = algo == 1 ? "" :
+      "<sharedKey><keyType>passPhrase</keyType><protected>false</protected><keyMaterial>" +
+      System.Security.SecurityElement.Escape(password) + "</keyMaterial></sharedKey>";
+    return "<?xml version=\"1.0\"?><WLANProfile xmlns=\"http://www.microsoft.com/networking/WLAN/profile/v1\">" +
+      "<name>" + esc + "</name><SSIDConfig><SSID><hex>" + hex + "</hex><name>" + esc + "</name></SSID></SSIDConfig>" +
+      "<connectionType>ESS</connectionType><connectionMode>auto</connectionMode><MSM><security><authEncryption>" +
+      "<authentication>" + auth + "</authentication><encryption>" + enc + "</encryption><useOneX>false</useOneX>" +
+      "</authEncryption>" + key + "</security></MSM></WLANProfile>";
+  }
+
+  // ok | needpassword | password | failed | enterprise | notfound
+  public static string Connect(string ssid, string password) {
+    IntPtr h = Open();
+    try {
+      Guid g = Iface(h);
+      var algos = new List<int>(); var ciphers = new List<int>();
+      var nets = Raw(h, g, algos, ciphers);
+      int idx = nets.FindIndex(x => x.Ssid == ssid);
+      if (idx < 0) return "notfound";
+      var net = nets[idx];
+      if (net.Connected && string.IsNullOrEmpty(password)) return "ok";
+      if (net.Auth == "enterprise") return "enterprise";
+      string profile = net.Profile;
+      bool created = false;
+      if (!net.Saved || !string.IsNullOrEmpty(password)) {
+        if (net.Secure && string.IsNullOrEmpty(password)) return "needpassword";
+        uint reason;
+        Check(WlanSetProfile(h, ref g, 0, ProfileXml(ssid, algos[idx], ciphers[idx], password ?? ""), null, true, IntPtr.Zero, out reason));
+        created = !net.Saved;
+        profile = ssid;
+      }
+      var p = new ConnParams { mode = 0, profile = profile, bssType = 1 };
+      Check(WlanConnect(h, ref g, ref p, IntPtr.Zero));
+      for (int t = 0; t < 30; t++) {
+        System.Threading.Thread.Sleep(500);
+        var now = Raw(h, g, null, null).Find(x => x.Ssid == ssid);
+        if (now != null && now.Connected) return "ok";
+      }
+      if (created) WlanDeleteProfile(h, ref g, profile, IntPtr.Zero); // don't keep a wrong password
+      return net.Secure ? "password" : "failed";
+    } finally { WlanCloseHandle(h, IntPtr.Zero); }
+  }
+
+  public static void Disconnect() {
+    IntPtr h = Open();
+    try { Guid g = Iface(h); Check(WlanDisconnect(h, ref g, IntPtr.Zero)); } finally { WlanCloseHandle(h, IntPtr.Zero); }
+  }
+
+  public static void Forget(string profile) {
+    IntPtr h = Open();
+    try { Guid g = Iface(h); Check(WlanDeleteProfile(h, ref g, profile, IntPtr.Zero)); } finally { WlanCloseHandle(h, IntPtr.Zero); }
   }
 }
 
@@ -124,8 +275,31 @@ function Get-State {
   $s
 }
 
+function Get-WifiList([bool]$scan) {
+  try {
+    $nets = [FrostWifi]::List($scan)
+    return @{ networks = @($nets | ForEach-Object {
+          [ordered]@{ ssid = $_.Ssid; signal = $_.Signal; secure = $_.Secure; auth = $_.Auth; connected = $_.Connected; saved = $_.Saved; profile = $_.Profile }
+        }) }
+  } catch {
+    $code = $_.Exception.InnerException.Code
+    if ($code -eq 5) { return @{ networks = @(); error = 'location' } }      # Windows 11 24H2+: needs Location access
+    if ($code -eq -1) { return @{ networks = @(); error = 'noadapter' } }
+    if ($code -eq 1062 -or $code -eq 21) { return @{ networks = @(); error = 'off' } } # service stopped / radio off
+    return @{ networks = @(); error = 'failed' }
+  }
+}
+
 function Invoke-Cmd($req) {
   switch ($req.cmd) {
+    'wifiList' { $script:wifi = Get-WifiList ([bool]$req.scan) }
+    'wifiConnect' {
+      try { $r = [FrostWifi]::Connect([string]$req.ssid, [string]$req.password) } catch { $r = 'failed' }
+      $script:wifi = Get-WifiList $false
+      $script:wifi.result = $r
+    }
+    'wifiDisconnect' { try { [FrostWifi]::Disconnect() } catch {}; Start-Sleep -Milliseconds 800; $script:wifi = Get-WifiList $false }
+    'wifiForget' { try { [FrostWifi]::Forget([string]$req.profile) } catch {}; $script:wifi = Get-WifiList $false }
     'setVolume' { [FrostAudio]::Volume = [float][math]::Max(0, [math]::Min(1, [double]$req.value)); if ([FrostAudio]::Mute -and $req.value -gt 0) { [FrostAudio]::Mute = $false } }
     'setMute' { [FrostAudio]::Mute = [bool]$req.value }
     'setBrightness' {
@@ -161,8 +335,10 @@ while ($null -ne ($line = [Console]::In.ReadLine())) {
   if (-not $line.Trim()) { continue }
   $req = $line | ConvertFrom-Json
   $res = [ordered]@{ id = $req.id; ok = $true }
+  $script:wifi = $null
   try { Invoke-Cmd $req } catch { $res.ok = $false; $res.error = "$_" }
+  if ($script:wifi) { $res.wifi = $script:wifi }
   $res.state = Get-State
-  [Console]::Out.WriteLine(($res | ConvertTo-Json -Compress -Depth 4))
+  [Console]::Out.WriteLine(($res | ConvertTo-Json -Compress -Depth 6))
   [Console]::Out.Flush()
 }

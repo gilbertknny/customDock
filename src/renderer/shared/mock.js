@@ -90,6 +90,13 @@
   const sampleIcon = (k) =>
     SAMPLE[k] ? 'data:image/svg+xml;utf8,' + encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 80">${SAMPLE[k]}</svg>`) : null;
 
+  const mockNets = [
+    { ssid: 'Rumah_5G', signal: 92, secure: true, auth: 'personal', connected: true, saved: true, profile: 'Rumah_5G' },
+    { ssid: 'Rumah_2.4G', signal: 78, secure: true, auth: 'personal', connected: false, saved: true, profile: 'Rumah_2.4G' },
+    { ssid: 'Kopi Kenangan Free WiFi', signal: 55, secure: false, auth: 'open', connected: false, saved: false },
+    { ssid: 'IndiHome-7F2A', signal: 48, secure: true, auth: 'personal', connected: false, saved: false },
+    { ssid: 'KANTOR-CORP', signal: 30, secure: true, auth: 'enterprise', connected: false, saved: false },
+  ];
   const ccState = { volume: 0.62, muted: false, brightness: 70, wifi: true, bluetooth: true, airplane: false, ssid: 'Rumah_5G', signal: 82, ethernet: false, lowPower: false, dnd: true };
 
   window.frost = {
@@ -138,6 +145,7 @@
     },
     browseApps: async () => [],
     openSettingsWindow: () => {},
+    setFocusable: () => {},
     media: (cmd) => {
       if (cmd === 'toggle') media = { ...media, playing: !media.playing };
       else media = { ...media, key: String(Math.random()), title: cmd === 'next' ? 'Midnight Frost' : 'Soft Focus', artist: 'Neon Drift', position: 0 };
@@ -149,6 +157,23 @@
     notifDismiss: (ids) => console.log('[mock] dismiss', ids),
     controls: async (req) => {
       const c = ccState;
+      if (req.cmd.startsWith('wifi')) {
+        const nets = mockNets;
+        const out = (extra = {}) => ({ ok: true, wifi: { networks: c.wifi ? nets.map((n) => ({ ...n })) : [], ...(c.wifi ? {} : { error: 'off' }), ...extra }, state: { ...c } });
+        await new Promise((r) => setTimeout(r, req.cmd === 'wifiConnect' ? 1400 : req.scan ? 900 : 120));
+        if (req.cmd === 'wifiDisconnect') { nets.forEach((n) => (n.connected = false)); c.ssid = null; return out(); }
+        if (req.cmd === 'wifiForget') { const n = nets.find((x) => x.profile === req.profile); if (n) Object.assign(n, { saved: false, connected: false }); return out(); }
+        if (req.cmd === 'wifiConnect') {
+          const n = nets.find((x) => x.ssid === req.ssid);
+          let result = 'ok';
+          if (n.auth === 'enterprise') result = 'enterprise';
+          else if (n.secure && !n.saved && !req.password) result = 'needpassword';
+          else if (n.secure && !n.saved && req.password !== 'password123') result = 'password';
+          if (result === 'ok') { nets.forEach((x) => (x.connected = false)); Object.assign(n, { connected: true, saved: true, profile: n.ssid }); c.ssid = n.ssid; }
+          return out({ result });
+        }
+        return out();
+      }
       if (req.cmd === 'setVolume') (c.volume = req.value), (c.muted = false);
       if (req.cmd === 'setMute') c.muted = !!req.value;
       if (req.cmd === 'setBrightness') c.brightness = req.value;

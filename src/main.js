@@ -381,6 +381,13 @@ handle('browse-apps', async (e) => {
   return res.filePaths.map((p) => ({ name: path.basename(p).replace(/\.(lnk|exe|url|bat|cmd)$/i, ''), path: p }));
 });
 on('open-settings-window', () => openSettings());
+// the notch is non-focusable so it never steals focus; it opts in only while you type (Wi-Fi password)
+on('set-focusable', (e, focusable) => {
+  const win = BrowserWindow.fromWebContents(e.sender);
+  if (!win || win === settingsWin) return;
+  win.setFocusable(!!focusable);
+  if (focusable) win.focus();
+});
 
 on('dock-reorder', (_e, from, to) => {
   updateItems((list) => {

@@ -104,10 +104,23 @@
           </div>
 
           <div class="page" data-page="controls">
+            <!-- Wi-Fi network picker (opens from the Wi-Fi tile) -->
+            <div class="wifi-panel">
+              <div class="wp-head">
+                <button class="icon-btn wp-back" title="Back"></button>
+                <b>Wi-Fi</b>
+                <span class="wp-status"></span>
+                <button class="icon-btn wp-refresh" title="Scan again"></button>
+                <label class="mini-switch" title="Wi-Fi on/off"><input type="checkbox" class="wp-toggle" /><i></i></label>
+              </div>
+              <div class="wp-list"></div>
+              <div class="wp-msg"></div>
+              <button class="wp-more" data-settings="ms-settings:network-wifi">More Wi-Fi settings</button>
+            </div>
             <div class="x-cc">
               <div class="cc-tiles">
                 <button class="cc-tile" data-cc="wifi" data-settings="ms-settings:network-wifi">
-                  <span class="ti"></span><span class="tl"><b>Wi-Fi</b><small></small></span>
+                  <span class="ti"></span><span class="tl"><b>Wi-Fi</b><small></small></span><span class="chev">›</span>
                 </button>
                 <button class="cc-tile" data-cc="bluetooth" data-settings="ms-settings:bluetooth">
                   <span class="ti"></span><span class="tl"><b>Bluetooth</b><small></small></span>

@@ -27,6 +27,11 @@
     leaf: s('<path d="M11 20A7 7 0 0 1 9.8 6.1C15.5 5 17 4.48 19 2c1 2 2 4.18 2 8 0 5.5-4.78 10-10 10z"/><path d="M2 21c0-3 1.85-5.36 5.08-6C9.5 14.52 12 13 13 12"/>'),
     moon: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>',
     sparkle: s('<path d="M12 3l1.9 5.8L20 11l-6.1 2.2L12 19l-1.9-5.8L4 11l6.1-2.2z"/>'),
+    back: s('<path d="M15 18l-6-6 6-6"/>'),
+    refresh: s('<path d="M21 12a9 9 0 1 1-3-6.7L21 8"/><path d="M21 3v5h-5"/>'),
+    lockSmall: s('<rect x="5" y="11" width="14" height="10" rx="2.5"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/>'),
+    eye: s('<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>'),
+    eyeOff: s('<path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19M1 1l22 22"/><path d="M14.12 14.12a3 3 0 1 1-4.24-4.24"/>'),
     bell: s('<path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9M13.73 21a2 2 0 0 1-3.46 0"/>'),
     close: s('<path d="M18 6L6 18M6 6l12 12"/>'),
     battery: s('<rect x="2" y="7" width="18" height="10" rx="2.5"/><path d="M22 11v2"/>'),
@@ -35,5 +40,12 @@
   const placeholder =
     '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><rect x="4" y="5" width="16" height="14" rx="2.5"/><path d="M4 9h16"/></svg>';
 
-  window.Icons = { placeholder, glyph: (n) => glyphs[n] || glyphs.music };
+  // Wi-Fi strength: 1-4 arcs lit
+  function signal(pct) {
+    const lvl = pct >= 75 ? 4 : pct >= 50 ? 3 : pct >= 25 ? 2 : 1;
+    const arc = (d, on) => `<path d="${d}" stroke="currentColor" stroke-width="2" stroke-linecap="round" fill="none" opacity="${on ? 1 : 0.25}"/>`;
+    return `<svg viewBox="0 0 24 24">${arc('M2 8.8a15 15 0 0 1 20 0', lvl >= 4)}${arc('M5 12.3a10 10 0 0 1 14 0', lvl >= 3)}${arc('M8.5 15.8a5 5 0 0 1 7 0', lvl >= 2)}<circle cx="12" cy="19.5" r="1.4" fill="currentColor" opacity="${lvl >= 1 ? 1 : 0.25}"/></svg>`;
+  }
+
+  window.Icons = { placeholder, signal, glyph: (n) => glyphs[n] || glyphs.music };
 })();

@@ -17,6 +17,7 @@ contextBridge.exposeInMainWorld('frost', {
   setDockOptions: (opts) => ipcRenderer.invoke('dock-set-options', opts),
   browseApps: () => ipcRenderer.invoke('browse-apps'),
   openSettingsWindow: () => ipcRenderer.send('open-settings-window'),
+  setFocusable: (v) => ipcRenderer.send('set-focusable', v),
   media: (cmd) => ipcRenderer.send('media', cmd),
   controls: (req) => ipcRenderer.invoke('controls', req),
   notifOpen: (id) => ipcRenderer.send('notif-open', id),
